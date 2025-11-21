@@ -68,7 +68,7 @@
 
   <div id="previewContainer">
     <h3>Как должно выглядеть:</h3>
-    <img id="previewImg" />
+    <div id="previewPuzzle" style="display:inline-grid; gap:2px;"></div>
   </div>
 
   <script>
@@ -93,6 +93,31 @@
     });
 
     showPreviewCheckbox.addEventListener('change', () => {
+      previewContainer.style.display = showPreviewCheckbox.checked ? 'block' : 'none';
+      if(showPreviewCheckbox.checked) renderPreview();
+    });
+
+    function renderPreview(){
+      const cols = parseInt(document.getElementById('cols').value);
+      const rows = parseInt(document.getElementById('rows').value);
+      const prev = document.getElementById('previewPuzzle');
+      if(!imageURL) return;
+      prev.style.gridTemplateColumns = `repeat(${cols}, 40px)`;
+      prev.style.gridTemplateRows = `repeat(${rows}, 40px)`;
+      prev.innerHTML = '';
+      for(let y=0;y<rows;y++){
+        for(let x=0;x<cols;x++){
+          const cell = document.createElement('div');
+          cell.style.width='40px';
+          cell.style.height='40px';
+          cell.style.backgroundImage = `url(${imageURL})`;
+          cell.style.backgroundSize = `${cols*40}px ${rows*40}px`;
+          cell.style.backgroundPosition = `-${x*40}px -${y*40}px`;
+          cell.style.border='1px solid #333';
+          prev.appendChild(cell);
+        }
+      }
+    }('change', () => {
       previewContainer.style.display = showPreviewCheckbox.checked ? 'block' : 'none';
     });
 
