@@ -12,6 +12,7 @@
       align-items: center;
       background: #f0f0f0;
       padding: 20px;
+      position: relative;
     }
     #controls {
       margin-bottom: 20px;
@@ -38,6 +39,9 @@
       max-width: 300px;
       border: 2px solid #444;
     }
+    #previewPuzzle div {
+      border:1px solid #333;
+    }
     .piece {
       background-size: cover;
       cursor: grab;
@@ -46,7 +50,23 @@
       user-select: none;
     }
     #message { margin-top: 12px; font-weight: bold; }
-      @media (max-width: 600px) {
+
+    /* Кнопка наверх */
+    #scrollUpBtn {
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      font-size: 24px;
+      background: #444;
+      color: #fff;
+      padding: 10px 15px;
+      border-radius: 8px;
+      cursor: pointer;
+      z-index: 1000;
+      display: none;
+    }
+
+    @media (max-width: 600px) {
       #puzzle { width: 100%; max-width: 100%; }
       .piece { width: 50px; height: 50px; }
       #previewPuzzle div { width: 25px !important; height: 25px !important; }
@@ -78,10 +98,15 @@
     <div id="previewPuzzle" style="display:inline-grid; gap:2px;"></div>
   </div>
 
+  <div id="scrollUpBtn">⬆️ Наверх</div>
+
   <script>
     const imgInput = document.getElementById('imageUpload');
     const showPreviewCheckbox = document.getElementById('showPreview');
     const previewContainer = document.getElementById('previewContainer');
+    const previewPuzzle = document.getElementById('previewPuzzle');
+    const scrollDown = document.getElementById('scrollDown');
+    const scrollUpBtn = document.getElementById('scrollUpBtn');
     const previewImg = document.getElementById('previewImg');
     const generateBtn = document.getElementById('generate');
     const shuffleBtn = document.getElementById('shuffleBtn');
@@ -91,7 +116,7 @@
 
     let imageURL = '';
 
-    imgInput.addEventListener('change', (e) => {
+    imgInput.addEventListener('change', e => {
       const file = e.target.files && e.target.files[0];
       if (file) {
         imageURL = URL.createObjectURL(file);
@@ -102,27 +127,21 @@
     showPreviewCheckbox.addEventListener('change', () => {
       const isOn = showPreviewCheckbox.checked;
       previewContainer.style.display = isOn ? 'block' : 'none';
-      document.getElementById('scrollDown').style.display = isOn ? 'block' : 'none';
+      scrollDown.style.display = isOn ? 'block' : 'none';
+      scrollUpBtn.style.display = isOn ? 'block' : 'none';
       if(isOn) renderPreview();
     });
 
-    document.getElementById('scrollDown').onclick = () => {
-      previewContainer.scrollIntoView({ behavior: 'smooth' });
-    };
-
-    ('change', () => {
-      previewContainer.style.display = showPreviewCheckbox.checked ? 'block' : 'none';
-      if(showPreviewCheckbox.checked) renderPreview();
-    });
+    scrollDown.onclick = () => previewContainer.scrollIntoView({ behavior: 'smooth' });
+    scrollUpBtn.onclick = () => window.scrollTo({ top: 0, behavior: 'smooth' });
 
     function renderPreview(){
       const cols = parseInt(document.getElementById('cols').value);
       const rows = parseInt(document.getElementById('rows').value);
-      const prev = document.getElementById('previewPuzzle');
       if(!imageURL) return;
-      prev.style.gridTemplateColumns = `repeat(${cols}, 40px)`;
-      prev.style.gridTemplateRows = `repeat(${rows}, 40px)`;
-      prev.innerHTML = '';
+      previewPuzzle.style.gridTemplateColumns = `repeat(${cols}, 40px)`;
+      previewPuzzle.style.gridTemplateRows = `repeat(${rows}, 40px)`;
+      previewPuzzle.innerHTML = '';
       for(let y=0;y<rows;y++){
         for(let x=0;x<cols;x++){
           const cell = document.createElement('div');
@@ -132,92 +151,9 @@
           cell.style.backgroundSize = `${cols*40}px ${rows*40}px`;
           cell.style.backgroundPosition = `-${x*40}px -${y*40}px`;
           cell.style.border='1px solid #333';
-          prev.appendChild(cell);
+          previewPuzzle.appendChild(cell);
         }
       }
-    }('change', () => {
-      previewContainer.style.display = showPreviewCheckbox.checked ? 'block' : 'none';
-    });
-
-    generateBtn.addEventListener('click', () => {
-      if (!imageURL) return alert('Загрузите изображение!');
-
-      const cols = parseInt(document.getElementById('cols').value);
-      const rows = parseInt(document.getElementById('rows').value);
-
-      puzzle.innerHTML = '';
-      puzzle.style.gridTemplateColumns = `repeat(${cols}, 100px)`;
-      message.textContent = '';
-
-      const pieces = [];
-      for (let y = 0; y < rows; y++) {
-        for (let x = 0; x < cols; x++) {
-          const piece = document.createElement('div');
-          piece.className = 'piece';
-          piece.style.backgroundImage = `url(${imageURL})`;
-          piece.style.backgroundSize = `${cols * 100}px ${rows * 100}px`;
-          piece.style.backgroundPosition = `-${x * 100}px -${y * 100}px`;
-          piece.dataset.correct = `${x}_${y}`;
-          piece.draggable = enableDrag.checked;
-          pieces.push(piece);
-        }
-      }
-
-      // перемешивание
-      pieces.sort(() => Math.random() - 0.5);
-      pieces.forEach(p => puzzle.appendChild(p));
-      shuffleBtn.disabled = false;
-
-      enableDragAndDrop();
-    });
-
-    shuffleBtn.addEventListener('click', () => {
-      const children = Array.from(puzzle.children);
-      children.sort(() => Math.random() - 0.5);
-      puzzle.innerHTML = '';
-      children.forEach(c => puzzle.appendChild(c));
-      message.textContent = '';
-    });
-
-    enableDrag.addEventListener('change', () => {
-      Array.from(puzzle.children).forEach(p => p.draggable = enableDrag.checked);
-    });
-
-    function enableDragAndDrop() {
-      let dragged = null;
-
-      puzzle.ondragstart = e => {
-        if (!e.target.classList.contains('piece')) return;
-        dragged = e.target;
-      };
-
-      puzzle.ondragover = e => e.preventDefault();
-
-      puzzle.ondrop = e => {
-        if (!e.target.classList.contains('piece')) return;
-        const target = e.target;
-
-        const draggedNext = dragged.nextSibling;
-        const targetNext = target.nextSibling;
-
-        puzzle.insertBefore(dragged, targetNext);
-        puzzle.insertBefore(target, draggedNext);
-
-        checkSolved();
-      };
-    }
-
-    function checkSolved() {
-      const items = Array.from(puzzle.children);
-      let solved = true;
-
-      items.forEach((p, i) => {
-        const x = i % parseInt(document.getElementById('cols').value);
-        const y = Math.floor(i / parseInt(document.getElementById('cols').value));
-        if (p.dataset.correct !== `${x}_${y}`) solved = false;
-      });
-
-      message.textContent = solved ? 'Пазл собран! 🎉' : '';
     }
   </script>
 </body>
