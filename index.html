@@ -76,6 +76,11 @@
     const showPreviewCheckbox = document.getElementById('showPreview');
     const previewContainer = document.getElementById('previewContainer');
     const previewImg = document.getElementById('previewImg');
+    const generateBtn = document.getElementById('generate');
+    const shuffleBtn = document.getElementById('shuffleBtn');
+    const puzzle = document.getElementById('puzzle');
+    const enableDrag = document.getElementById('enableDrag');
+    const message = document.getElementById('message');
 
     let imageURL = '';
 
@@ -90,6 +95,87 @@
     showPreviewCheckbox.addEventListener('change', () => {
       previewContainer.style.display = showPreviewCheckbox.checked ? 'block' : 'none';
     });
+
+    generateBtn.addEventListener('click', () => {
+      if (!imageURL) return alert('Загрузите изображение!');
+
+      const cols = parseInt(document.getElementById('cols').value);
+      const rows = parseInt(document.getElementById('rows').value);
+
+      puzzle.innerHTML = '';
+      puzzle.style.gridTemplateColumns = `repeat(${cols}, 100px)`;
+      message.textContent = '';
+
+      const pieces = [];
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const piece = document.createElement('div');
+          piece.className = 'piece';
+          piece.style.backgroundImage = `url(${imageURL})`;
+          piece.style.backgroundSize = `${cols * 100}px ${rows * 100}px`;
+          piece.style.backgroundPosition = `-${x * 100}px -${y * 100}px`;
+          piece.dataset.correct = `${x}_${y}`;
+          piece.draggable = enableDrag.checked;
+          pieces.push(piece);
+        }
+      }
+
+      // перемешивание
+      pieces.sort(() => Math.random() - 0.5);
+      pieces.forEach(p => puzzle.appendChild(p));
+      shuffleBtn.disabled = false;
+
+      enableDragAndDrop();
+    });
+
+    shuffleBtn.addEventListener('click', () => {
+      const children = Array.from(puzzle.children);
+      children.sort(() => Math.random() - 0.5);
+      puzzle.innerHTML = '';
+      children.forEach(c => puzzle.appendChild(c));
+      message.textContent = '';
+    });
+
+    enableDrag.addEventListener('change', () => {
+      Array.from(puzzle.children).forEach(p => p.draggable = enableDrag.checked);
+    });
+
+    function enableDragAndDrop() {
+      let dragged = null;
+
+      puzzle.ondragstart = e => {
+        if (!e.target.classList.contains('piece')) return;
+        dragged = e.target;
+      };
+
+      puzzle.ondragover = e => e.preventDefault();
+
+      puzzle.ondrop = e => {
+        if (!e.target.classList.contains('piece')) return;
+        const target = e.target;
+
+        const draggedNext = dragged.nextSibling;
+        const targetNext = target.nextSibling;
+
+        puzzle.insertBefore(dragged, targetNext);
+        puzzle.insertBefore(target, draggedNext);
+
+        checkSolved();
+      };
+    }
+
+    function checkSolved() {
+      const items = Array.from(puzzle.children);
+      let solved = true;
+
+      items.forEach((p, i) => {
+        const x = i % parseInt(document.getElementById('cols').value);
+        const y = Math.floor(i / parseInt(document.getElementById('cols').value));
+        if (p.dataset.correct !== `${x}_${y}`) solved = false;
+      });
+
+      message.textContent = solved ? 'Пазл собран! 🎉' : '';
+    }
   </script>
 </body>
 </html>
