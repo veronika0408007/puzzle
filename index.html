@@ -1,319 +1,129 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Виртуальный пазл</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      background: #f0f0f0;
-      padding: 20px;
-    }
-
-    #controls {
-      margin-bottom: 20px;
-      display: flex;
-      gap: 8px;
-      align-items: center;
-      flex-wrap: wrap;
-      max-width: 100%;
-    }
-
-    #puzzle {
-      display: grid;
-      gap: 2px;
-      background: #ccc;
-      padding: 5px;
-      border: 2px solid #000;
-      width: 100%;
-      max-width: 95vw;
-    }
-
-    .piece {
-      background-size: cover;
-      cursor: grab;
-      width: 100px;
-      height: 100px;
-      user-select: none;
-    }
-
-    #previewContainer {
-      margin-top: 15px;
-      display: none;
-      text-align: center;
-    }
-
-    #previewContainer img {
-      max-width: 300px;
-      border: 2px solid #444;
-    }
-
-    #message { margin-top: 12px; font-weight: bold; }
-
-      #controls {
-        flex-direction: column;
-        align-items: stretch;
-        width: 100%;
-      }
-
-      #puzzle {
-        width: 100%;
-        max-width: 100%;
-        gap: 1px;
-      }
-
-      .piece {
-        width: 55px;
-        height: 55px;
-        background-size: cover !important;
-      }
-
-      #previewPuzzle div {
-        width: 30px !important;
-        height: 30px !important;
-        background-size: cover !important;
-      }
-
-      h1 { font-size: 22px; }
-      button, input { font-size: 16px; }
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Виртуальный пазл</title>
+<style>
+body {
+  font-family: Arial, sans-serif;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: #f0f0f0;
+  padding: 20px;
+}
+#controls {
+  margin-bottom: 20px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+#puzzle {
+  display: grid;
+  gap: 2px;
+  background: #ccc;
+  padding: 5px;
+  border: 2px solid #000;
+  min-width: 200px;
+  min-height: 200px;
+}
+.piece {
+  background-size: cover;
+  cursor: grab;
+  width: 100px;
+  height: 100px;
+  user-select: none;
+}
+#message { margin-top: 12px; font-weight: bold; }
+</style>
 </head>
 <body>
-  <h1>Виртуальный пазл</h1>
+<h1>Виртуальный пазл</h1>
+<div id="controls">
+  <input type="file" id="imageUpload" accept="image/*" />
+  <label>Ширина:</label>
+  <input type="number" id="cols" min="2" max="15" value="5" style="width:60px" />
+  <label>Высота:</label>
+  <input type="number" id="rows" min="2" max="15" value="6" style="width:60px" />
+  <button id="generate">Создать пазл</button>
+</div>
+<div id="puzzle"></div>
+<div id="message"></div>
+<script>
+const imgInput = document.getElementById('imageUpload');
+const generateBtn = document.getElementById('generate');
+const puzzle = document.getElementById('puzzle');
+const message = document.getElementById('message');
 
-  <div id="controls">
-    <input type="file" id="imageUpload" accept="image/*" />
-    <label>Ширина:</label>
-    <input type="number" id="cols" min="2" max="15" value="5" style="width:60px" />
-    <label>Высота:</label>
-    <input type="number" id="rows" min="2" max="15" value="6" style="width:60px" />
-    <label><input type="checkbox" id="enableDrag" checked/> Перетаскивание</label>
-    <label><input type="checkbox" id="showPreview"/> Показать результат</label>
-    <button id="generate">Создать пазл</button>
-    <button id="shuffleBtn" disabled>Перемешать</button>
-  </div>
+let imageURL = '';
 
-  <div id="puzzle"></div>
-  <div id="message"></div>
-  <div id="timer" style="margin-top:10px;font-size:20px;font-weight:bold;">Время: 0 сек</div>
+imgInput.addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (file) imageURL = URL.createObjectURL(file);
+});
 
-  <!-- Превью итогового результата -->
-  <div id="previewContainer">
-    <h3>Как должно выглядеть:</h3>
-    <div id="previewPuzzle" style="display:inline-grid; gap:2px;"></div>
-  </div>
+generateBtn.addEventListener('click', () => {
+  if (!imageURL) return alert('Загрузите изображение!');
 
-  <div id="scrollDownBtn">⬇️ Вниз</div>
-  <div id="scrollUpBtn">⬆️ Наверх</div>
+  const cols = parseInt(document.getElementById('cols').value);
+  const rows = parseInt(document.getElementById('rows').value);
 
-  <script>
-    const imgInput = document.getElementById('imageUpload');
-    const colsInput = document.getElementById('cols');
-    const rowsInput = document.getElementById('rows');
-    const showPreviewCheckbox = document.getElementById('showPreview');
-    const enableDrag = document.getElementById('enableDrag');
-    const generateBtn = document.getElementById('generate');
-    const shuffleBtn = document.getElementById('shuffleBtn');
-    const puzzle = document.getElementById('puzzle');
-    const previewContainer = document.getElementById('previewContainer');
-    const previewPuzzle = document.getElementById('previewPuzzle');
-    const scrollDownBtn = document.getElementById('scrollDownBtn');
-    const scrollUpBtn = document.getElementById('scrollUpBtn');
+  puzzle.innerHTML = '';
+  puzzle.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+  puzzle.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
 
-    let imageURL = '';
-    let correctOrder = [];
-    let timerInterval = null;
-    let startTime = null;
-    let hasStarted = false;
+  const total = rows * cols;
+  const pieces = [];
 
-    imgInput.addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (file) imageURL = URL.createObjectURL(file);
-    });
+  for (let i = 0; i < total; i++) {
+    const piece = document.createElement('div');
+    piece.className = 'piece';
 
-    showPreviewCheckbox.addEventListener('change', () => {
-      const isOn = showPreviewCheckbox.checked;
-      previewContainer.style.display = isOn ? 'block' : 'none';
-      scrollDownBtn.style.display = isOn ? 'block' : 'none';
-      scrollUpBtn.style.display = isOn ? 'block' : 'none';
-      if (isOn) renderPreview();
-    });
+    const row = Math.floor(i / cols);
+    const col = i % cols;
 
-    scrollDownBtn.onclick = () => previewContainer.scrollIntoView({ behavior: 'smooth' });
-    scrollUpBtn.onclick = () => window.scrollTo({ top: 0, behavior: 'smooth' });
+    piece.style.backgroundImage = `url(${imageURL})`;
+    piece.style.backgroundSize = `${cols * 100}% ${rows * 100}%`;
+    piece.style.backgroundPosition = `${(col/(cols-1))*100}% ${(row/(rows-1))*100}%`;
 
-    generateBtn.onclick = () => {
-      if (!imageURL) return alert("Загрузите картинку!");
-      generatePuzzle();
-      shuffleBtn.disabled = false;
-    };
+    piece.dataset.correct = i;
 
-    shuffleBtn.onclick = () => shufflePieces();
+    makeDraggable(piece);
+    pieces.push(piece);
+  }
 
-    function generatePuzzle() {
-      const cols = parseInt(colsInput.value);
-      const rows = parseInt(rowsInput.value);
+  pieces.sort(() => Math.random() - 0.5);
+  pieces.forEach(p => puzzle.appendChild(p));
+});
 
-      puzzle.innerHTML = '';
-      puzzle.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
-      puzzle.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
+function makeDraggable(piece) {
+  piece.draggable = true;
+  piece.addEventListener('dragstart', e => e.dataTransfer.setData('index', [...puzzle.children].indexOf(piece)));
+  piece.addEventListener('dragover', e => e.preventDefault());
+  piece.addEventListener('drop', e => {
+    e.preventDefault();
+    const from = e.dataTransfer.getData('index');
+    const to = [...puzzle.children].indexOf(e.target);
+    swapPieces(from, to);
+    checkSolved();
+  });
+}
 
-      correctOrder = [];
+function swapPieces(i, j) {
+  const pieces = [...puzzle.children];
+  if(i === j) return;
+  puzzle.insertBefore(pieces[i], pieces[j]);
+  puzzle.insertBefore(pieces[j], pieces[i+1] || null);
+}
 
-      let index = 0;
-      for (let y = 0; y < rows; y++) {
-        for (let x = 0; x < cols; x++) {
-          const piece = document.createElement('div');
-          piece.classList.add('piece');
-
-          piece.style.backgroundImage = `url(${imageURL})`;
-          piece.style.backgroundSize = `${cols * 100}% ${rows * 100}%`;
-          piece.style.backgroundPosition = `${(x / (cols - 1)) * 100}% ${(y / (rows - 1)) * 100}%`;
-
-          piece.dataset.index = index;
-          correctOrder.push(index);
-
-          if (enableDrag.checked) enableDragging(piece);
-
-          puzzle.appendChild(piece);
-          index++;
-        }
-      }
-    }
-
-    function enableDragging(piece) {
-      piece.draggable = true;
-
-      piece.addEventListener('dragstart', (e) => {
-        e.dataTransfer.setData('index', piece.dataset.index);
-      });
-
-      piece.addEventListener('dragover', (e) => e.preventDefault());
-
-      piece.addEventListener('drop', (e) => {
-        const from = e.dataTransfer.getData('index');
-        const to = piece.dataset.index;
-        swapPieces(from, to);
-      });
-    }
-
-    function swapPieces(i, j) {
-      if (!hasStarted) startTimer();
-      const pieces = [...document.querySelectorAll('.piece')];
-      const a = pieces.find(p => p.dataset.index == i);
-      const b = pieces.find(p => p.dataset.index == j);
-
-      const temp = a.style.backgroundPosition;
-      a.style.backgroundPosition = b.style.backgroundPosition;
-      b.style.backgroundPosition = temp;
-
-      const tempIndex = a.dataset.index;
-      a.dataset.index = b.dataset.index;
-      b.dataset.index = tempIndex;
-
-      checkPiecePositions();
-    }(i, j) {
-      const pieces = [...document.querySelectorAll('.piece')];
-      const a = pieces.find(p => p.dataset.index == i);
-      const b = pieces.find(p => p.dataset.index == j);
-
-      const temp = a.style.backgroundPosition;
-      a.style.backgroundPosition = b.style.backgroundPosition;
-      b.style.backgroundPosition = temp;
-
-      const tempIndex = a.dataset.index;
-      a.dataset.index = b.dataset.index;
-      b.dataset.index = tempIndex;
-    }
-
-    function shufflePieces() {
-      const pieces = [...document.querySelectorAll('.piece')];
-      for (let i = pieces.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        swapPieces(i, j);
-      }
-    }
-
-    function renderPreview() {
-      const cols = parseInt(colsInput.value);
-      const rows = parseInt(rowsInput.value);
-
-      previewPuzzle.style.gridTemplateColumns = `repeat(${cols}, 40px)`;
-      previewPuzzle.style.gridTemplateRows = `repeat(${rows}, 40px)`;
-      previewPuzzle.innerHTML = '';
-
-      for (let y = 0; y < rows; y++) {
-        for (let x = 0; x < cols; x++) {
-          const cell = document.createElement('div');
-          cell.style.width = '40px';
-          cell.style.height = '40px';
-          cell.style.backgroundImage = `url(${imageURL})`;
-          cell.style.backgroundSize = `${cols * 40}px ${rows * 40}px`;
-          cell.style.backgroundPosition = `-${x * 40}px -${y * 40}px`;
-          previewPuzzle.appendChild(cell);
-        }
-      }
-    }
-
-    /* Проверка правильного положения пазла */
-    function checkPiecePositions() {
-      const pieces = [...document.querySelectorAll('.piece')];
-      let solved = true;
-      pieces.forEach((p, i) => {
-        if (parseInt(p.dataset.index) === correctOrder[i]) p.style.border = '2px solid #00cc00';
-        else {
-          p.style.border = '2px solid #cc0000';
-          solved = false;
-        }
-      });
-      if (solved) stopTimer();
-    }
-
-    function startTimer() {
-      hasStarted = true;
-      startTime = Date.now();
-      timerInterval = setInterval(() => {
-        const sec = Math.floor((Date.now() - startTime) / 1000);
-        document.getElementById('timer').textContent = `Время: ${sec} сек`;
-      }, 500);
-    }
-
-    function stopTimer() {
-      clearInterval(timerInterval);
-      const sec = Math.floor((Date.now() - startTime) / 1000);
-      document.getElementById('timer').textContent = `Пазл собран! Время: ${sec} сек`;
-    }() {
-      const pieces = [...document.querySelectorAll('.piece')];
-      pieces.forEach((p, i) => {
-        if (parseInt(p.dataset.index) === correctOrder[i]) p.style.border = '2px solid #00cc00';
-        else p.style.border = '2px solid #cc0000';
-      });
-    }
-
-    /* Мобильный режим */
-    document.addEventListener('touchstart', (e) => {
-      const piece = e.target.closest('.piece');
-      if (!piece) return;
-      piece.dataset.touching = '1';
-      piece.dataset.startIndex = piece.dataset.index;
-    });
-
-    document.addEventListener('touchend', (e) => {
-      const piece = e.target.closest('.piece');
-      if (!piece) return;
-      const start = piece.dataset.startIndex;
-      const target = document.elementFromPoint(
-        e.changedTouches[0].clientX,
-        e.changedTouches[0].clientY
-      );
-      if (target && target.classList.contains('piece')) {
-        swapPieces(start, target.dataset.index);
-        checkPiecePositions();
-      }
-    });
-  </script>
+function checkSolved() {
+  const items = [...puzzle.children];
+  let solved = true;
+  items.forEach((p, i) => { if (p.dataset.correct != i) solved = false; });
+  message.textContent = solved ? 'Пазл собран! 🎉' : '';
+}
+</script>
+</body>
+</html>
