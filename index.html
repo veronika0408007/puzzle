@@ -30,47 +30,58 @@
       min-width: 200px;
       min-height: 200px;
     }
+    .piece {
+      background-size: cover;
+      cursor: grab;
+      width: 80px;
+      height: 80px;
+      user-select: none;
+    }
     #previewContainer {
       margin-top: 15px;
       display: none;
       text-align: center;
     }
-    #previewContainer img {
-      max-width: 300px;
-      border: 2px solid #444;
-    }
     #previewPuzzle div {
-      border:1px solid #333;
-    }
-    .piece {
-      background-size: cover;
-      cursor: grab;
-      width: 100px;
-      height: 100px;
-      user-select: none;
+      border: 1px solid #333;
     }
     #message { margin-top: 12px; font-weight: bold; }
 
-    /* Кнопка наверх */
+    /* Стрелки */
+    #scrollDownBtn {
+      position: fixed;
+      right: 20px;
+      top: 20px;
+      font-size: 28px;
+      background: #444;
+      color: #fff;
+      padding: 8px 14px;
+      border-radius: 10px;
+      cursor: pointer;
+      z-index: 2000;
+      display: none;
+    }
+
     #scrollUpBtn {
       position: fixed;
       right: 20px;
       bottom: 20px;
-      font-size: 24px;
+      font-size: 28px;
       background: #444;
       color: #fff;
       padding: 10px 15px;
-      border-radius: 8px;
+      border-radius: 10px;
       cursor: pointer;
-      z-index: 1000;
+      z-index: 2000;
       display: none;
     }
 
+    /* Адаптация под телефон */
     @media (max-width: 600px) {
-      #puzzle { width: 100%; max-width: 100%; }
-      .piece { width: 50px; height: 50px; }
-      #previewPuzzle div { width: 25px !important; height: 25px !important; }
+      .piece { width: 45px; height: 45px; }
+      #puzzle { width: 100%; }
       #controls { flex-direction: column; align-items: flex-start; }
+      #previewPuzzle div { width: 25px !important; height: 25px !important; }
     }
   </style>
 </head>
@@ -80,9 +91,9 @@
   <div id="controls">
     <input type="file" id="imageUpload" accept="image/*" />
     <label>Ширина:</label>
-    <input type="number" id="cols" min="2" max="10" value="5" style="width:60px" />
+    <input type="number" id="cols" min="2" max="15" value="5" style="width:60px" />
     <label>Высота:</label>
-    <input type="number" id="rows" min="2" max="10" value="6" style="width:60px" />
+    <input type="number" id="rows" min="2" max="15" value="6" style="width:60px" />
     <label><input type="checkbox" id="enableDrag" checked/> Перетаскивание</label>
     <label><input type="checkbox" id="showPreview"/> Показать результат</label>
     <button id="generate">Создать пазл</button>
@@ -92,69 +103,135 @@
   <div id="puzzle"></div>
   <div id="message"></div>
 
+  <!-- Превью итогового результата -->
   <div id="previewContainer">
-    <div id="scrollDown" style="display:none; font-size:32px; cursor:pointer; text-align:center; margin-bottom:10px;">⬇️</div>
     <h3>Как должно выглядеть:</h3>
     <div id="previewPuzzle" style="display:inline-grid; gap:2px;"></div>
   </div>
 
+  <div id="scrollDownBtn">⬇️ Вниз</div>
   <div id="scrollUpBtn">⬆️ Наверх</div>
 
   <script>
     const imgInput = document.getElementById('imageUpload');
+    const colsInput = document.getElementById('cols');
+    const rowsInput = document.getElementById('rows');
     const showPreviewCheckbox = document.getElementById('showPreview');
-    const previewContainer = document.getElementById('previewContainer');
-    const previewPuzzle = document.getElementById('previewPuzzle');
-    const scrollDown = document.getElementById('scrollDown');
-    const scrollUpBtn = document.getElementById('scrollUpBtn');
-    const previewImg = document.getElementById('previewImg');
+    const enableDrag = document.getElementById('enableDrag');
     const generateBtn = document.getElementById('generate');
     const shuffleBtn = document.getElementById('shuffleBtn');
     const puzzle = document.getElementById('puzzle');
-    const enableDrag = document.getElementById('enableDrag');
-    const message = document.getElementById('message');
+    const previewContainer = document.getElementById('previewContainer');
+    const previewPuzzle = document.getElementById('previewPuzzle');
+    const scrollDownBtn = document.getElementById('scrollDownBtn');
+    const scrollUpBtn = document.getElementById('scrollUpBtn');
 
     let imageURL = '';
+    let correctOrder = [];
 
-    imgInput.addEventListener('change', e => {
-      const file = e.target.files && e.target.files[0];
-      if (file) {
-        imageURL = URL.createObjectURL(file);
-        previewImg.src = imageURL;
-      }
+    imgInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) imageURL = URL.createObjectURL(file);
     });
 
     showPreviewCheckbox.addEventListener('change', () => {
       const isOn = showPreviewCheckbox.checked;
       previewContainer.style.display = isOn ? 'block' : 'none';
-      scrollDown.style.display = isOn ? 'block' : 'none';
+      scrollDownBtn.style.display = isOn ? 'block' : 'none';
       scrollUpBtn.style.display = isOn ? 'block' : 'none';
-      if(isOn) renderPreview();
+      if (isOn) renderPreview();
     });
 
-    scrollDown.onclick = () => previewContainer.scrollIntoView({ behavior: 'smooth' });
+    scrollDownBtn.onclick = () => previewContainer.scrollIntoView({ behavior: 'smooth' });
     scrollUpBtn.onclick = () => window.scrollTo({ top: 0, behavior: 'smooth' });
 
-    function renderPreview(){
-      const cols = parseInt(document.getElementById('cols').value);
-      const rows = parseInt(document.getElementById('rows').value);
-      if(!imageURL) return;
-      previewPuzzle.style.gridTemplateColumns = `repeat(${cols}, 40px)`;
-      previewPuzzle.style.gridTemplateRows = `repeat(${rows}, 40px)`;
-      previewPuzzle.innerHTML = '';
-      for(let y=0;y<rows;y++){
-        for(let x=0;x<cols;x++){
-          const cell = document.createElement('div');
-          cell.style.width='40px';
-          cell.style.height='40px';
-          cell.style.backgroundImage = `url(${imageURL})`;
-          cell.style.backgroundSize = `${cols*40}px ${rows*40}px`;
-          cell.style.backgroundPosition = `-${x*40}px -${y*40}px`;
-          cell.style.border='1px solid #333';
-          previewPuzzle.appendChild(cell);
+    generateBtn.onclick = () => {
+      if (!imageURL) return alert("Загрузите картинку!");
+      generatePuzzle();
+      shuffleBtn.disabled = false;
+    };
+
+    shuffleBtn.onclick = () => shufflePieces();
+
+    function generatePuzzle() {
+      const cols = parseInt(colsInput.value);
+      const rows = parseInt(rowsInput.value);
+
+      puzzle.innerHTML = '';
+      puzzle.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+      puzzle.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
+
+      correctOrder = [];
+
+      let index = 0;
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const piece = document.createElement('div');
+          piece.classList.add('piece');
+
+          piece.style.backgroundImage = `url(${imageURL})`;
+          piece.style.backgroundSize = `${cols * 100}% ${rows * 100}%`;
+          piece.style.backgroundPosition = `${(x / (cols - 1)) * 100}% ${(y / (rows - 1)) * 100}%`;
+
+          piece.dataset.index = index;
+          correctOrder.push(index);
+
+          if (enableDrag.checked) enableDragging(piece);
+
+          puzzle.appendChild(piece);
+          index++;
         }
       }
     }
-  </script>
-</body>
-</html>
+
+    function enableDragging(piece) {
+      piece.draggable = true;
+
+      piece.addEventListener('dragstart', (e) => {
+        e.dataTransfer.setData('index', piece.dataset.index);
+      });
+
+      piece.addEventListener('dragover', (e) => e.preventDefault());
+
+      piece.addEventListener('drop', (e) => {
+        const from = e.dataTransfer.getData('index');
+        const to = piece.dataset.index;
+        swapPieces(from, to);
+      });
+    }
+
+    function swapPieces(i, j) {
+      const pieces = [...document.querySelectorAll('.piece')];
+      const a = pieces.find(p => p.dataset.index == i);
+      const b = pieces.find(p => p.dataset.index == j);
+
+      const temp = a.style.backgroundPosition;
+      a.style.backgroundPosition = b.style.backgroundPosition;
+      b.style.backgroundPosition = temp;
+
+      const tempIndex = a.dataset.index;
+      a.dataset.index = b.dataset.index;
+      b.dataset.index = tempIndex;
+    }
+
+    function shufflePieces() {
+      const pieces = [...document.querySelectorAll('.piece')];
+      for (let i = pieces.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        swapPieces(i, j);
+      }
+    }
+
+    function renderPreview() {
+      const cols = parseInt(colsInput.value);
+      const rows = parseInt(rowsInput.value);
+
+      previewPuzzle.style.gridTemplateColumns = `repeat(${cols}, 40px)`;
+      previewPuzzle.style.gridTemplateRows = `repeat(${rows}, 40px)`;
+      previewPuzzle.innerHTML = '';
+
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const cell = document.createElement('div');
+          cell.style.width = '40px';
+          cell.style.height = '40px';
