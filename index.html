@@ -8,10 +8,10 @@
 body { font-family: Arial; display: flex; flex-direction: column; align-items: center; padding: 20px; }
 #controls { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
 #puzzle { display: grid; gap: 2px; border: 2px solid #000; padding:5px; }
-.piece { background-size: cover; cursor: grab; user-select: none; width: 100px; height: 100px; }
+.piece { background-size: cover; cursor: grab; user-select: none; }
 #message { margin-top:12px; font-weight:bold; }
 #previewContainer { margin-top:15px; display:none; text-align:center; }
-#previewContainer .previewPiece { display:inline-block; width: 100px; height: 100px; background-size: cover; border:2px solid #444; margin:1px; }
+#previewContainer .previewPiece { display:inline-block; border:2px solid #444; margin:1px; background-size: cover; background-position: center center; }
 </style>
 </head>
 <body>
@@ -30,51 +30,56 @@ body { font-family: Arial; display: flex; flex-direction: column; align-items: c
 <div id="message"></div>
 <h3 id="timer">Время: 0 сек</h3>
 <script>
-const imgInput = document.getElementById('imageUpload');
-const generateBtn = document.getElementById('generate');
-const shuffleBtn = document.getElementById('shuffleBtn');
-const previewBtn = document.getElementById('previewBtn');
-const enableCheck = document.getElementById('enableCheck');
-const puzzle = document.getElementById('puzzle');
-const previewContainer = document.getElementById('previewContainer');
-const previewPuzzle = document.getElementById('previewPuzzle');
-const message = document.getElementById('message');
-const timerDisplay = document.getElementById('timer');
+const imgInput=document.getElementById('imageUpload');
+const generateBtn=document.getElementById('generate');
+const shuffleBtn=document.getElementById('shuffleBtn');
+const previewBtn=document.getElementById('previewBtn');
+const enableCheck=document.getElementById('enableCheck');
+const puzzle=document.getElementById('puzzle');
+const previewContainer=document.getElementById('previewContainer');
+const previewPuzzle=document.getElementById('previewPuzzle');
+const message=document.getElementById('message');
+const timerDisplay=document.getElementById('timer');
 
-let imageURL = '';
-let piecesData = [];
-let startTime = null;
-let timerInterval = null;
-let hasStarted = false;
+let imageURL='';
+let piecesData=[];
+let startTime=null;
+let timerInterval=null;
+let hasStarted=false;
 let cols=5, rows=6;
+let pieceWidth=100, pieceHeight=100;
 
-imgInput.addEventListener('change', e => {
-  const file = e.target.files[0];
-  if(file) {
-    imageURL = URL.createObjectURL(file);
-  }
+imgInput.addEventListener('change',e=>{
+  const file=e.target.files[0];
+  if(file) imageURL=URL.createObjectURL(file);
 });
 
-previewBtn.addEventListener('click', () => {
+previewBtn.addEventListener('click',()=>{
   if(!imageURL) return alert('Загрузите изображение');
   renderPreview();
-  previewContainer.style.display = 'block';
+  previewContainer.style.display='block';
 });
 
-generateBtn.addEventListener('click', () => {
+generateBtn.addEventListener('click',()=>{
   if(!imageURL) return alert('Загрузите изображение');
-  cols = parseInt(document.getElementById('cols').value);
-  rows = parseInt(document.getElementById('rows').value);
+  cols=parseInt(document.getElementById('cols').value);
+  rows=parseInt(document.getElementById('rows').value);
 
-  puzzle.innerHTML = '';
-  puzzle.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
-  puzzle.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
+  pieceWidth=Math.floor(500/cols);
+  pieceHeight=Math.floor(500/rows);
 
-  piecesData = [];
-  const total = cols*rows;
-  for(let i=0;i<total;i++){
-    const piece = document.createElement('div');
+  puzzle.style.width=(pieceWidth*cols)+'px';
+  puzzle.style.height=(pieceHeight*rows)+'px';
+  puzzle.style.gridTemplateColumns=`repeat(${cols}, ${pieceWidth}px)`;
+  puzzle.style.gridTemplateRows=`repeat(${rows}, ${pieceHeight}px)`;
+  puzzle.innerHTML='';
+
+  piecesData=[];
+  for(let i=0;i<cols*rows;i++){
+    const piece=document.createElement('div');
     piece.className='piece';
+    piece.style.width=pieceWidth+'px';
+    piece.style.height=pieceHeight+'px';
     const row=Math.floor(i/cols);
     const col=i%cols;
     piece.style.backgroundImage=`url(${imageURL})`;
@@ -93,10 +98,10 @@ generateBtn.addEventListener('click', () => {
   timerDisplay.textContent='Время: 0 сек';
 });
 
-shuffleBtn.addEventListener('click', shufflePieces);
+shuffleBtn.addEventListener('click',shufflePieces);
 
 function shufflePieces(){
-  const pieces = [...piecesData];
+  const pieces=[...piecesData];
   pieces.sort(()=>Math.random()-0.5);
   puzzle.innerHTML='';
   pieces.forEach((p,i)=>{ p.dataset.current=i; puzzle.appendChild(p); });
@@ -106,12 +111,12 @@ function shufflePieces(){
 
 function makeDraggable(piece){
   piece.draggable=true;
-  piece.addEventListener('dragstart', e=>{
+  piece.addEventListener('dragstart',e=>{
     e.dataTransfer.setData('index',[...puzzle.children].indexOf(piece));
     if(!hasStarted) startTimer();
   });
-  piece.addEventListener('dragover', e=>e.preventDefault());
-  piece.addEventListener('drop', e=>{
+  piece.addEventListener('dragover',e=>e.preventDefault());
+  piece.addEventListener('drop',e=>{
     e.preventDefault();
     const from=[...puzzle.children].indexOf(piecesData[e.dataTransfer.getData('index')]);
     const to=[...puzzle.children].indexOf(e.target);
@@ -122,8 +127,8 @@ function makeDraggable(piece){
 }
 
 function swapPieces(i,j){
-  const children=[...puzzle.children];
   if(i===j) return;
+  const children=[...puzzle.children];
   puzzle.insertBefore(children[i],children[j]);
   puzzle.insertBefore(children[j],children[i+1]||null);
   children[i].dataset.current=i;
@@ -134,12 +139,8 @@ function checkPositions(){
   const children=[...puzzle.children];
   let solved=true;
   children.forEach((p,i)=>{
-    if(parseInt(p.dataset.correct)===i){
-      p.style.border='2px solid green';
-    } else {
-      p.style.border='2px solid red';
-      solved=false;
-    }
+    if(parseInt(p.dataset.correct)===i){ p.style.border='2px solid green'; }
+    else { p.style.border='2px solid red'; solved=false; }
   });
   message.textContent=solved?'Пазл собран! 🎉':'';
   if(solved) stopTimer();
@@ -166,11 +167,15 @@ function stopTimer(){
 
 function renderPreview(){
   previewPuzzle.innerHTML='';
+  previewPuzzle.style.width=(pieceWidth*cols)+'px';
+  previewPuzzle.style.height=(pieceHeight*rows)+'px';
   for(let i=0;i<cols*rows;i++){
     const div=document.createElement('div');
+    div.className='previewPiece';
+    div.style.width=pieceWidth+'px';
+    div.style.height=pieceHeight+'px';
     const row=Math.floor(i/cols);
     const col=i%cols;
-    div.className='previewPiece';
     div.style.backgroundImage=`url(${imageURL})`;
     div.style.backgroundSize=`${cols*100}% ${rows*100}%`;
     div.style.backgroundPosition=`${(col/(cols-1))*100}% ${(row/(rows-1))*100}%`;
