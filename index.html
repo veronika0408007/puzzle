@@ -6,67 +6,66 @@
 <title>Виртуальный пазл</title>
 <style>
 body {
-  font-family: Arial, sans-serif;
+  font-family: Arial;
   display: flex;
   flex-direction: column;
   align-items: center;
-  background: #f0f0f0;
   padding: 20px;
 }
-#controls {
-  margin-bottom: 20px;
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-#puzzle {
-  display: grid;
-  gap: 2px;
-  background: #ccc;
-  padding: 5px;
-  border: 2px solid #000;
-  min-width: 200px;
-  min-height: 200px;
-}
-.piece {
-  background-size: cover;
-  cursor: grab;
-  width: 100px;
-  height: 100px;
-  user-select: none;
-}
-#message { margin-top: 12px; font-weight: bold; }
+#controls { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+#puzzle { display: grid; gap: 2px; border: 2px solid #000; padding:5px; }
+.piece { background-size: cover; cursor: grab; user-select: none; }
+#message { margin-top:12px; font-weight:bold; }
+#previewContainer { margin-top:15px; display:none; text-align:center; }
+#previewContainer img { max-width:300px; border:2px solid #444; }
 </style>
 </head>
 <body>
 <h1>Виртуальный пазл</h1>
 <div id="controls">
   <input type="file" id="imageUpload" accept="image/*" />
-  <label>Ширина:</label>
-  <input type="number" id="cols" min="2" max="15" value="5" style="width:60px" />
-  <label>Высота:</label>
-  <input type="number" id="rows" min="2" max="15" value="6" style="width:60px" />
+  <label>Ширина: <input type="number" id="cols" min="2" max="15" value="5" style="width:60px"></label>
+  <label>Высота: <input type="number" id="rows" min="2" max="15" value="6" style="width:60px"></label>
   <button id="generate">Создать пазл</button>
+  <button id="shuffleBtn" disabled>Перемешать</button>
+  <button id="previewBtn">Показать картинку</button>
 </div>
+<div id="previewContainer"><h3>Как должно выглядеть:</h3><img id="previewImg"></div>
 <div id="puzzle"></div>
 <div id="message"></div>
+<h3 id="timer">Время: 0 сек</h3>
 <script>
 const imgInput = document.getElementById('imageUpload');
 const generateBtn = document.getElementById('generate');
+const shuffleBtn = document.getElementById('shuffleBtn');
+const previewBtn = document.getElementById('previewBtn');
 const puzzle = document.getElementById('puzzle');
+const previewContainer = document.getElementById('previewContainer');
+const previewImg = document.getElementById('previewImg');
 const message = document.getElementById('message');
+const timerDisplay = document.getElementById('timer');
 
 let imageURL = '';
+let correctOrder = [];
+let startTime = null;
+let timerInterval = null;
+let hasStarted = false;
 
-imgInput.addEventListener('change', (e) => {
+imgInput.addEventListener('change', e => {
   const file = e.target.files[0];
-  if (file) imageURL = URL.createObjectURL(file);
+  if(file) {
+    imageURL = URL.createObjectURL(file);
+    previewImg.src = imageURL;
+  }
+});
+
+previewBtn.addEventListener('click', () => {
+  if(!imageURL) return alert('Загрузите изображение');
+  previewContainer.style.display = 'block';
 });
 
 generateBtn.addEventListener('click', () => {
-  if (!imageURL) return alert('Загрузите изображение!');
-
+  if(!imageURL) return alert('Загрузите изображение');
   const cols = parseInt(document.getElementById('cols').value);
   const rows = parseInt(document.getElementById('rows').value);
 
@@ -74,55 +73,88 @@ generateBtn.addEventListener('click', () => {
   puzzle.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
   puzzle.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
 
-  const total = rows * cols;
-  const pieces = [];
+  correctOrder = [];
+  let total = cols*rows;
+  let pieces = [];
 
-  for (let i = 0; i < total; i++) {
+  for(let i=0;i<total;i++){
     const piece = document.createElement('div');
-    piece.className = 'piece';
-
-    const row = Math.floor(i / cols);
-    const col = i % cols;
-
-    piece.style.backgroundImage = `url(${imageURL})`;
-    piece.style.backgroundSize = `${cols * 100}% ${rows * 100}%`;
-    piece.style.backgroundPosition = `${(col/(cols-1))*100}% ${(row/(rows-1))*100}%`;
-
-    piece.dataset.correct = i;
-
+    piece.className='piece';
+    const row=Math.floor(i/cols);
+    const col=i%cols;
+    piece.style.backgroundImage=`url(${imageURL})`;
+    piece.style.backgroundSize=`${cols*100}% ${rows*100}%`;
+    piece.style.backgroundPosition=`${(col/(cols-1))*100}% ${(row/(rows-1))*100}%`;
+    piece.dataset.correct=i;
     makeDraggable(piece);
     pieces.push(piece);
+    correctOrder.push(i);
   }
 
-  pieces.sort(() => Math.random() - 0.5);
-  pieces.forEach(p => puzzle.appendChild(p));
+  pieces = shuffle(pieces);
+  pieces.forEach(p=>puzzle.appendChild(p));
+  shuffleBtn.disabled=false;
+
+  hasStarted=false;
+  startTime=null;
+  clearInterval(timerInterval);
+  timerDisplay.textContent='Время: 0 сек';
 });
 
-function makeDraggable(piece) {
-  piece.draggable = true;
-  piece.addEventListener('dragstart', e => e.dataTransfer.setData('index', [...puzzle.children].indexOf(piece)));
-  piece.addEventListener('dragover', e => e.preventDefault());
-  piece.addEventListener('drop', e => {
+shuffleBtn.addEventListener('click', () => {
+  const pieces=[...puzzle.children];
+  pieces.sort(()=>Math.random()-0.5);
+  puzzle.innerHTML='';
+  pieces.forEach(p=>puzzle.appendChild(p));
+  message.textContent='';
+});
+
+function makeDraggable(piece){
+  piece.draggable=true;
+  piece.addEventListener('dragstart', e=>{
+    e.dataTransfer.setData('index',[...puzzle.children].indexOf(piece));
+    if(!hasStarted) startTimer();
+  });
+  piece.addEventListener('dragover', e=>e.preventDefault());
+  piece.addEventListener('drop', e=>{
     e.preventDefault();
     const from = e.dataTransfer.getData('index');
     const to = [...puzzle.children].indexOf(e.target);
-    swapPieces(from, to);
+    swapPieces(from,to);
     checkSolved();
   });
 }
 
-function swapPieces(i, j) {
-  const pieces = [...puzzle.children];
-  if(i === j) return;
-  puzzle.insertBefore(pieces[i], pieces[j]);
-  puzzle.insertBefore(pieces[j], pieces[i+1] || null);
+function swapPieces(i,j){
+  const pieces=[...puzzle.children];
+  if(i===j) return;
+  puzzle.insertBefore(pieces[i],pieces[j]);
+  puzzle.insertBefore(pieces[j],pieces[i+1]||null);
 }
 
-function checkSolved() {
-  const items = [...puzzle.children];
-  let solved = true;
-  items.forEach((p, i) => { if (p.dataset.correct != i) solved = false; });
-  message.textContent = solved ? 'Пазл собран! 🎉' : '';
+function checkSolved(){
+  const items=[...puzzle.children];
+  let solved=true;
+  items.forEach((p,i)=>{ if(p.dataset.correct!=i) solved=false; });
+  message.textContent=solved?'Пазл собран! 🎉':'';
+  if(solved) stopTimer();
+}
+
+function shuffle(array){return array.sort(()=>Math.random()-0.5);}
+
+function startTimer(){
+  hasStarted=true;
+  startTime=Date.now();
+  timerInterval=setInterval(()=>{
+    const sec=Math.floor((Date.now()-startTime)/1000);
+    timerDisplay.textContent='Время: '+sec+' сек';
+  },500);
+}
+
+function stopTimer(){
+  clearInterval(timerInterval);
+  const sec=Math.floor((Date.now()-startTime)/1000);
+  timerDisplay.textContent='Пазл собран! Время: '+sec+' сек';
 }
 </script>
 </body>
