@@ -12,7 +12,6 @@
       align-items: center;
       background: #f0f0f0;
       padding: 20px;
-      position: relative;
     }
     #controls {
       margin-bottom: 20px;
@@ -30,58 +29,28 @@
       min-width: 200px;
       min-height: 200px;
     }
-    .piece {
-      background-size: cover;
-      cursor: grab;
-      width: 80px;
-      height: 80px;
-      user-select: none;
-    }
     #previewContainer {
       margin-top: 15px;
       display: none;
       text-align: center;
     }
-    #previewPuzzle div {
-      border: 1px solid #333;
+    #previewContainer img {
+      max-width: 300px;
+      border: 2px solid #444;
+    }
+    .piece {
+      background-size: cover;
+      cursor: grab;
+      width: 100px;
+      height: 100px;
+      user-select: none;
     }
     #message { margin-top: 12px; font-weight: bold; }
-
-    /* Стрелки */
-    #scrollDownBtn {
-      position: fixed;
-      right: 20px;
-      top: 20px;
-      font-size: 28px;
-      background: #444;
-      color: #fff;
-      padding: 8px 14px;
-      border-radius: 10px;
-      cursor: pointer;
-      z-index: 2000;
-      display: none;
-    }
-
-    #scrollUpBtn {
-      position: fixed;
-      right: 20px;
-      bottom: 20px;
-      font-size: 28px;
-      background: #444;
-      color: #fff;
-      padding: 10px 15px;
-      border-radius: 10px;
-      cursor: pointer;
-      z-index: 2000;
-      display: none;
-    }
-
-    /* Адаптация под телефон */
-    @media (max-width: 600px) {
-      .piece { width: 45px; height: 45px; }
-      #puzzle { width: 100%; }
-      #controls { flex-direction: column; align-items: flex-start; }
+      @media (max-width: 600px) {
+      #puzzle { width: 100%; max-width: 100%; }
+      .piece { width: 50px; height: 50px; }
       #previewPuzzle div { width: 25px !important; height: 25px !important; }
+      #controls { flex-direction: column; align-items: flex-start; }
     }
   </style>
 </head>
@@ -103,135 +72,141 @@
   <div id="puzzle"></div>
   <div id="message"></div>
 
-  <!-- Превью итогового результата -->
   <div id="previewContainer">
     <h3>Как должно выглядеть:</h3>
     <div id="previewPuzzle" style="display:inline-grid; gap:2px;"></div>
   </div>
 
-  <div id="scrollDownBtn">⬇️ Вниз</div>
-  <div id="scrollUpBtn">⬆️ Наверх</div>
-
   <script>
     const imgInput = document.getElementById('imageUpload');
-    const colsInput = document.getElementById('cols');
-    const rowsInput = document.getElementById('rows');
     const showPreviewCheckbox = document.getElementById('showPreview');
-    const enableDrag = document.getElementById('enableDrag');
+    const previewContainer = document.getElementById('previewContainer');
+    const previewImg = document.getElementById('previewImg');
     const generateBtn = document.getElementById('generate');
     const shuffleBtn = document.getElementById('shuffleBtn');
     const puzzle = document.getElementById('puzzle');
-    const previewContainer = document.getElementById('previewContainer');
-    const previewPuzzle = document.getElementById('previewPuzzle');
-    const scrollDownBtn = document.getElementById('scrollDownBtn');
-    const scrollUpBtn = document.getElementById('scrollUpBtn');
+    const enableDrag = document.getElementById('enableDrag');
+    const message = document.getElementById('message');
 
     let imageURL = '';
-    let correctOrder = [];
 
     imgInput.addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (file) imageURL = URL.createObjectURL(file);
+      const file = e.target.files && e.target.files[0];
+      if (file) {
+        imageURL = URL.createObjectURL(file);
+        previewImg.src = imageURL;
+      }
     });
 
     showPreviewCheckbox.addEventListener('change', () => {
-      const isOn = showPreviewCheckbox.checked;
-      previewContainer.style.display = isOn ? 'block' : 'none';
-      scrollDownBtn.style.display = isOn ? 'block' : 'none';
-      scrollUpBtn.style.display = isOn ? 'block' : 'none';
-      if (isOn) renderPreview();
+      previewContainer.style.display = showPreviewCheckbox.checked ? 'block' : 'none';
+      if(showPreviewCheckbox.checked) renderPreview();
     });
 
-    scrollDownBtn.onclick = () => previewContainer.scrollIntoView({ behavior: 'smooth' });
-    scrollUpBtn.onclick = () => window.scrollTo({ top: 0, behavior: 'smooth' });
+    function renderPreview(){
+      const cols = parseInt(document.getElementById('cols').value);
+      const rows = parseInt(document.getElementById('rows').value);
+      const prev = document.getElementById('previewPuzzle');
+      if(!imageURL) return;
+      prev.style.gridTemplateColumns = `repeat(${cols}, 40px)`;
+      prev.style.gridTemplateRows = `repeat(${rows}, 40px)`;
+      prev.innerHTML = '';
+      for(let y=0;y<rows;y++){
+        for(let x=0;x<cols;x++){
+          const cell = document.createElement('div');
+          cell.style.width='40px';
+          cell.style.height='40px';
+          cell.style.backgroundImage = `url(${imageURL})`;
+          cell.style.backgroundSize = `${cols*40}px ${rows*40}px`;
+          cell.style.backgroundPosition = `-${x*40}px -${y*40}px`;
+          cell.style.border='1px solid #333';
+          prev.appendChild(cell);
+        }
+      }
+    }('change', () => {
+      previewContainer.style.display = showPreviewCheckbox.checked ? 'block' : 'none';
+    });
 
-    generateBtn.onclick = () => {
-      if (!imageURL) return alert("Загрузите картинку!");
-      generatePuzzle();
-      shuffleBtn.disabled = false;
-    };
+    generateBtn.addEventListener('click', () => {
+      if (!imageURL) return alert('Загрузите изображение!');
 
-    shuffleBtn.onclick = () => shufflePieces();
-
-    function generatePuzzle() {
-      const cols = parseInt(colsInput.value);
-      const rows = parseInt(rowsInput.value);
+      const cols = parseInt(document.getElementById('cols').value);
+      const rows = parseInt(document.getElementById('rows').value);
 
       puzzle.innerHTML = '';
-      puzzle.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
-      puzzle.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
+      puzzle.style.gridTemplateColumns = `repeat(${cols}, 100px)`;
+      message.textContent = '';
 
-      correctOrder = [];
-
-      let index = 0;
+      const pieces = [];
       for (let y = 0; y < rows; y++) {
         for (let x = 0; x < cols; x++) {
           const piece = document.createElement('div');
-          piece.classList.add('piece');
-
+          piece.className = 'piece';
           piece.style.backgroundImage = `url(${imageURL})`;
-          piece.style.backgroundSize = `${cols * 100}% ${rows * 100}%`;
-          piece.style.backgroundPosition = `${(x / (cols - 1)) * 100}% ${(y / (rows - 1)) * 100}%`;
-
-          piece.dataset.index = index;
-          correctOrder.push(index);
-
-          if (enableDrag.checked) enableDragging(piece);
-
-          puzzle.appendChild(piece);
-          index++;
+          piece.style.backgroundSize = `${cols * 100}px ${rows * 100}px`;
+          piece.style.backgroundPosition = `-${x * 100}px -${y * 100}px`;
+          piece.dataset.correct = `${x}_${y}`;
+          piece.draggable = enableDrag.checked;
+          pieces.push(piece);
         }
       }
+
+      // перемешивание
+      pieces.sort(() => Math.random() - 0.5);
+      pieces.forEach(p => puzzle.appendChild(p));
+      shuffleBtn.disabled = false;
+
+      enableDragAndDrop();
+    });
+
+    shuffleBtn.addEventListener('click', () => {
+      const children = Array.from(puzzle.children);
+      children.sort(() => Math.random() - 0.5);
+      puzzle.innerHTML = '';
+      children.forEach(c => puzzle.appendChild(c));
+      message.textContent = '';
+    });
+
+    enableDrag.addEventListener('change', () => {
+      Array.from(puzzle.children).forEach(p => p.draggable = enableDrag.checked);
+    });
+
+    function enableDragAndDrop() {
+      let dragged = null;
+
+      puzzle.ondragstart = e => {
+        if (!e.target.classList.contains('piece')) return;
+        dragged = e.target;
+      };
+
+      puzzle.ondragover = e => e.preventDefault();
+
+      puzzle.ondrop = e => {
+        if (!e.target.classList.contains('piece')) return;
+        const target = e.target;
+
+        const draggedNext = dragged.nextSibling;
+        const targetNext = target.nextSibling;
+
+        puzzle.insertBefore(dragged, targetNext);
+        puzzle.insertBefore(target, draggedNext);
+
+        checkSolved();
+      };
     }
 
-    function enableDragging(piece) {
-      piece.draggable = true;
+    function checkSolved() {
+      const items = Array.from(puzzle.children);
+      let solved = true;
 
-      piece.addEventListener('dragstart', (e) => {
-        e.dataTransfer.setData('index', piece.dataset.index);
+      items.forEach((p, i) => {
+        const x = i % parseInt(document.getElementById('cols').value);
+        const y = Math.floor(i / parseInt(document.getElementById('cols').value));
+        if (p.dataset.correct !== `${x}_${y}`) solved = false;
       });
 
-      piece.addEventListener('dragover', (e) => e.preventDefault());
-
-      piece.addEventListener('drop', (e) => {
-        const from = e.dataTransfer.getData('index');
-        const to = piece.dataset.index;
-        swapPieces(from, to);
-      });
+      message.textContent = solved ? 'Пазл собран! 🎉' : '';
     }
-
-    function swapPieces(i, j) {
-      const pieces = [...document.querySelectorAll('.piece')];
-      const a = pieces.find(p => p.dataset.index == i);
-      const b = pieces.find(p => p.dataset.index == j);
-
-      const temp = a.style.backgroundPosition;
-      a.style.backgroundPosition = b.style.backgroundPosition;
-      b.style.backgroundPosition = temp;
-
-      const tempIndex = a.dataset.index;
-      a.dataset.index = b.dataset.index;
-      b.dataset.index = tempIndex;
-    }
-
-    function shufflePieces() {
-      const pieces = [...document.querySelectorAll('.piece')];
-      for (let i = pieces.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        swapPieces(i, j);
-      }
-    }
-
-    function renderPreview() {
-      const cols = parseInt(colsInput.value);
-      const rows = parseInt(rowsInput.value);
-
-      previewPuzzle.style.gridTemplateColumns = `repeat(${cols}, 40px)`;
-      previewPuzzle.style.gridTemplateRows = `repeat(${rows}, 40px)`;
-      previewPuzzle.innerHTML = '';
-
-      for (let y = 0; y < rows; y++) {
-        for (let x = 0; x < cols; x++) {
-          const cell = document.createElement('div');
-          cell.style.width = '40px';
-          cell.style.height = '40px';
+  </script>
+</body>
+</html>
