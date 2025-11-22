@@ -11,7 +11,7 @@ body { font-family: Arial; display: flex; flex-direction: column; align-items: c
 .piece { background-size: cover; cursor: grab; user-select: none; width: 100px; height: 100px; }
 #message { margin-top:12px; font-weight:bold; }
 #previewContainer { margin-top:15px; display:none; text-align:center; }
-#previewContainer img { max-width:300px; border:2px solid #444; }
+#previewContainer .previewPiece { display:inline-block; width: 100px; height: 100px; background-size: cover; border:2px solid #444; margin:1px; }
 </style>
 </head>
 <body>
@@ -20,11 +20,12 @@ body { font-family: Arial; display: flex; flex-direction: column; align-items: c
 <input type="file" id="imageUpload" accept="image/*" />
 <label>Ширина: <input type="number" id="cols" min="2" max="15" value="5" style="width:60px"></label>
 <label>Высота: <input type="number" id="rows" min="2" max="15" value="6" style="width:60px"></label>
+<label><input type="checkbox" id="enableCheck" checked> Проверять позиции деталей</label>
 <button id="generate">Создать пазл</button>
 <button id="shuffleBtn" disabled>Перемешать</button>
 <button id="previewBtn">Показать картинку</button>
 </div>
-<div id="previewContainer"><h3>Как должно выглядеть:</h3><img id="previewImg"></div>
+<div id="previewContainer"><h3>Как должно выглядеть:</h3><div id="previewPuzzle"></div></div>
 <div id="puzzle"></div>
 <div id="message"></div>
 <h3 id="timer">Время: 0 сек</h3>
@@ -33,9 +34,10 @@ const imgInput = document.getElementById('imageUpload');
 const generateBtn = document.getElementById('generate');
 const shuffleBtn = document.getElementById('shuffleBtn');
 const previewBtn = document.getElementById('previewBtn');
+const enableCheck = document.getElementById('enableCheck');
 const puzzle = document.getElementById('puzzle');
 const previewContainer = document.getElementById('previewContainer');
-const previewImg = document.getElementById('previewImg');
+const previewPuzzle = document.getElementById('previewPuzzle');
 const message = document.getElementById('message');
 const timerDisplay = document.getElementById('timer');
 
@@ -44,24 +46,25 @@ let piecesData = [];
 let startTime = null;
 let timerInterval = null;
 let hasStarted = false;
+let cols=5, rows=6;
 
 imgInput.addEventListener('change', e => {
   const file = e.target.files[0];
   if(file) {
     imageURL = URL.createObjectURL(file);
-    previewImg.src = imageURL;
   }
 });
 
 previewBtn.addEventListener('click', () => {
   if(!imageURL) return alert('Загрузите изображение');
+  renderPreview();
   previewContainer.style.display = 'block';
 });
 
 generateBtn.addEventListener('click', () => {
   if(!imageURL) return alert('Загрузите изображение');
-  const cols = parseInt(document.getElementById('cols').value);
-  const rows = parseInt(document.getElementById('rows').value);
+  cols = parseInt(document.getElementById('cols').value);
+  rows = parseInt(document.getElementById('rows').value);
 
   puzzle.innerHTML = '';
   puzzle.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
@@ -113,7 +116,8 @@ function makeDraggable(piece){
     const from=[...puzzle.children].indexOf(piecesData[e.dataTransfer.getData('index')]);
     const to=[...puzzle.children].indexOf(e.target);
     swapPieces(from,to);
-    checkPositions();
+    if(enableCheck.checked) checkPositions();
+    else if(isPuzzleSolved()) stopTimer();
   });
 }
 
@@ -141,6 +145,10 @@ function checkPositions(){
   if(solved) stopTimer();
 }
 
+function isPuzzleSolved(){
+  return [...puzzle.children].every((p,i)=>parseInt(p.dataset.correct)===i);
+}
+
 function startTimer(){
   hasStarted=true;
   startTime=Date.now();
@@ -154,6 +162,20 @@ function stopTimer(){
   clearInterval(timerInterval);
   const sec=Math.floor((Date.now()-startTime)/1000);
   timerDisplay.textContent='Пазл собран! Время: '+sec+' сек';
+}
+
+function renderPreview(){
+  previewPuzzle.innerHTML='';
+  for(let i=0;i<cols*rows;i++){
+    const div=document.createElement('div');
+    const row=Math.floor(i/cols);
+    const col=i%cols;
+    div.className='previewPiece';
+    div.style.backgroundImage=`url(${imageURL})`;
+    div.style.backgroundSize=`${cols*100}% ${rows*100}%`;
+    div.style.backgroundPosition=`${(col/(cols-1))*100}% ${(row/(rows-1))*100}%`;
+    previewPuzzle.appendChild(div);
+  }
 }
 </script>
 </body>
