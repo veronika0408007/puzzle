@@ -5,16 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Виртуальный пазл</title>
 <style>
-body {
-  font-family: Arial;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 20px;
-}
+body { font-family: Arial; display: flex; flex-direction: column; align-items: center; padding: 20px; }
 #controls { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
 #puzzle { display: grid; gap: 2px; border: 2px solid #000; padding:5px; }
-.piece { background-size: cover; cursor: grab; user-select: none; }
+.piece { background-size: cover; cursor: grab; user-select: none; width: 100px; height: 100px; }
 #message { margin-top:12px; font-weight:bold; }
 #previewContainer { margin-top:15px; display:none; text-align:center; }
 #previewContainer img { max-width:300px; border:2px solid #444; }
@@ -23,12 +17,12 @@ body {
 <body>
 <h1>Виртуальный пазл</h1>
 <div id="controls">
-  <input type="file" id="imageUpload" accept="image/*" />
-  <label>Ширина: <input type="number" id="cols" min="2" max="15" value="5" style="width:60px"></label>
-  <label>Высота: <input type="number" id="rows" min="2" max="15" value="6" style="width:60px"></label>
-  <button id="generate">Создать пазл</button>
-  <button id="shuffleBtn" disabled>Перемешать</button>
-  <button id="previewBtn">Показать картинку</button>
+<input type="file" id="imageUpload" accept="image/*" />
+<label>Ширина: <input type="number" id="cols" min="2" max="15" value="5" style="width:60px"></label>
+<label>Высота: <input type="number" id="rows" min="2" max="15" value="6" style="width:60px"></label>
+<button id="generate">Создать пазл</button>
+<button id="shuffleBtn" disabled>Перемешать</button>
+<button id="previewBtn">Показать картинку</button>
 </div>
 <div id="previewContainer"><h3>Как должно выглядеть:</h3><img id="previewImg"></div>
 <div id="puzzle"></div>
@@ -46,7 +40,7 @@ const message = document.getElementById('message');
 const timerDisplay = document.getElementById('timer');
 
 let imageURL = '';
-let correctOrder = [];
+let piecesData = [];
 let startTime = null;
 let timerInterval = null;
 let hasStarted = false;
@@ -73,10 +67,8 @@ generateBtn.addEventListener('click', () => {
   puzzle.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
   puzzle.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
 
-  correctOrder = [];
-  let total = cols*rows;
-  let pieces = [];
-
+  piecesData = [];
+  const total = cols*rows;
   for(let i=0;i<total;i++){
     const piece = document.createElement('div');
     piece.className='piece';
@@ -86,28 +78,28 @@ generateBtn.addEventListener('click', () => {
     piece.style.backgroundSize=`${cols*100}% ${rows*100}%`;
     piece.style.backgroundPosition=`${(col/(cols-1))*100}% ${(row/(rows-1))*100}%`;
     piece.dataset.correct=i;
+    piece.dataset.current=i;
     makeDraggable(piece);
-    pieces.push(piece);
-    correctOrder.push(i);
+    piecesData.push(piece);
   }
 
-  pieces = shuffle(pieces);
-  pieces.forEach(p=>puzzle.appendChild(p));
-  shuffleBtn.disabled=false;
-
+  shufflePieces();
   hasStarted=false;
   startTime=null;
   clearInterval(timerInterval);
   timerDisplay.textContent='Время: 0 сек';
 });
 
-shuffleBtn.addEventListener('click', () => {
-  const pieces=[...puzzle.children];
+shuffleBtn.addEventListener('click', shufflePieces);
+
+function shufflePieces(){
+  const pieces = [...piecesData];
   pieces.sort(()=>Math.random()-0.5);
   puzzle.innerHTML='';
-  pieces.forEach(p=>puzzle.appendChild(p));
+  pieces.forEach((p,i)=>{ p.dataset.current=i; puzzle.appendChild(p); });
+  shuffleBtn.disabled=false;
   message.textContent='';
-});
+}
 
 function makeDraggable(piece){
   piece.draggable=true;
@@ -118,29 +110,36 @@ function makeDraggable(piece){
   piece.addEventListener('dragover', e=>e.preventDefault());
   piece.addEventListener('drop', e=>{
     e.preventDefault();
-    const from = e.dataTransfer.getData('index');
-    const to = [...puzzle.children].indexOf(e.target);
+    const from=[...puzzle.children].indexOf(piecesData[e.dataTransfer.getData('index')]);
+    const to=[...puzzle.children].indexOf(e.target);
     swapPieces(from,to);
-    checkSolved();
+    checkPositions();
   });
 }
 
 function swapPieces(i,j){
-  const pieces=[...puzzle.children];
+  const children=[...puzzle.children];
   if(i===j) return;
-  puzzle.insertBefore(pieces[i],pieces[j]);
-  puzzle.insertBefore(pieces[j],pieces[i+1]||null);
+  puzzle.insertBefore(children[i],children[j]);
+  puzzle.insertBefore(children[j],children[i+1]||null);
+  children[i].dataset.current=i;
+  children[j].dataset.current=j;
 }
 
-function checkSolved(){
-  const items=[...puzzle.children];
+function checkPositions(){
+  const children=[...puzzle.children];
   let solved=true;
-  items.forEach((p,i)=>{ if(p.dataset.correct!=i) solved=false; });
+  children.forEach((p,i)=>{
+    if(parseInt(p.dataset.correct)===i){
+      p.style.border='2px solid green';
+    } else {
+      p.style.border='2px solid red';
+      solved=false;
+    }
+  });
   message.textContent=solved?'Пазл собран! 🎉':'';
   if(solved) stopTimer();
 }
-
-function shuffle(array){return array.sort(()=>Math.random()-0.5);}
 
 function startTimer(){
   hasStarted=true;
