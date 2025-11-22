@@ -1,207 +1,212 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8">
-<title>Puzzle</title>
-<style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Виртуальный пазл</title>
+  <style>
     body {
-        font-family: Arial;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        padding: 20px;
-        gap: 20px;
+      font-family: Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background: #f0f0f0;
+      padding: 20px;
     }
-
     #controls {
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-        max-width: 300px;
+      margin-bottom: 20px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
     }
-
     #puzzle {
-        display: grid;
-        gap: 2px;
-        touch-action: none;
+      display: grid;
+      gap: 2px;
+      background: #ccc;
+      padding: 5px;
+      border: 2px solid #000;
+      min-width: 200px;
+      min-height: 200px;
     }
-
+    #previewContainer {
+      margin-top: 15px;
+      display: none;
+      text-align: center;
+    }
+    #previewContainer img {
+      max-width: 300px;
+      border: 2px solid #444;
+    }
     .piece {
-        background-size: 100% 100%;
-        background-repeat: no-repeat;
-        border: 1px solid #888;
-        width: 100%;
-        aspect-ratio: 1;
-        touch-action: none;
-        user-select: none;
+      background-size: cover;
+      cursor: grab;
+      width: 100px;
+      height: 100px;
+      user-select: none;
     }
-
-    #preview {
-        max-width: 200px;
-        border: 2px solid #000;
+    #message { margin-top: 12px; font-weight: bold; }
+      @media (max-width: 600px) {
+      #puzzle { width: 100%; max-width: 100%; }
+      .piece { width: 50px; height: 50px; }
+      #previewPuzzle div { width: 25px !important; height: 25px !important; }
+      #controls { flex-direction: column; align-items: flex-start; }
     }
-
-    @media (max-width: 600px) {
-        #puzzle {
-            width: 95vw;
-        }
-    }
-</style>
+  </style>
 </head>
 <body>
+  <h1>Виртуальный пазл</h1>
 
-<h2>Собери пазл</h2>
-
-<div id="controls">
-    <input type="file" id="imgInput">
-    <label>Высота (строки): <input type="number" id="rows" value="4" min="2" max="15"></label>
-    <label>Ширина (колонки): <input type="number" id="cols" value="4" min="2" max="15"></label>
+  <div id="controls">
+    <input type="file" id="imageUpload" accept="image/*" />
+    <label>Ширина:</label>
+    <input type="number" id="cols" min="2" max="15" value="5" style="width:60px" />
+    <label>Высота:</label>
+    <input type="number" id="rows" min="2" max="15" value="6" style="width:60px" />
+    <label><input type="checkbox" id="enableDrag" checked/> Перетаскивание</label>
+    <label><input type="checkbox" id="showPreview"/> Показать результат</label>
     <button id="generate">Создать пазл</button>
-</div>
+    <button id="shuffleBtn" disabled>Перемешать</button>
+  </div>
 
-<h3>Правильный результат:</h3>
-<img id="preview">
+  <div id="puzzle"></div>
+  <div id="message"></div>
 
-<h3 id="timer">Время: 0 сек</h3>
+  <div id="previewContainer">
+    <h3>Как должно выглядеть:</h3>
+    <div id="previewPuzzle" style="display:inline-grid; gap:2px;"></div>
+  </div>
 
-<div id="puzzle"></div>
+  <script>
+    const imgInput = document.getElementById('imageUpload');
+    const showPreviewCheckbox = document.getElementById('showPreview');
+    const previewContainer = document.getElementById('previewContainer');
+    const previewImg = document.getElementById('previewImg');
+    const generateBtn = document.getElementById('generate');
+    const shuffleBtn = document.getElementById('shuffleBtn');
+    const puzzle = document.getElementById('puzzle');
+    const enableDrag = document.getElementById('enableDrag');
+    const message = document.getElementById('message');
 
-<script>
-let correctOrder = [];
-let hasStarted = false;
-let timerInterval = null;
-let startTime = null;
+    let imageURL = '';
 
-document.getElementById("generate").onclick = async function () {
-    const file = document.getElementById("imgInput").files[0];
-    const rows = +document.getElementById("rows").value;
-    const cols = +document.getElementById("cols").value;
-
-    if (!file) return alert("Загрузите картинку!");
-
-    const imgURL = URL.createObjectURL(file);
-    const preview = document.getElementById("preview");
-    preview.src = imgURL;
-
-    const img = await loadImage(imgURL);
-
-    createPuzzle(img, rows, cols);
-    startTime = null;
-    hasStarted = false;
-    document.getElementById("timer").textContent = "Время: 0 сек";
-};
-
-function loadImage(src) {
-    return new Promise(res => {
-        const img = new Image();
-        img.onload = () => res(img);
-        img.src = src;
+    imgInput.addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (file) {
+        imageURL = URL.createObjectURL(file);
+        previewImg.src = imageURL;
+      }
     });
-}
 
-function createPuzzle(img, rows, cols) {
-    const puzzle = document.getElementById("puzzle");
-    puzzle.innerHTML = "";
-    puzzle.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
-    puzzle.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+    showPreviewCheckbox.addEventListener('change', () => {
+      previewContainer.style.display = showPreviewCheckbox.checked ? 'block' : 'none';
+      if(showPreviewCheckbox.checked) renderPreview();
+    });
 
-    const total = rows * cols;
+    function renderPreview(){
+      const cols = parseInt(document.getElementById('cols').value);
+      const rows = parseInt(document.getElementById('rows').value);
+      const prev = document.getElementById('previewPuzzle');
+      if(!imageURL) return;
+      prev.style.gridTemplateColumns = `repeat(${cols}, 40px)`;
+      prev.style.gridTemplateRows = `repeat(${rows}, 40px)`;
+      prev.innerHTML = '';
+      for(let y=0;y<rows;y++){
+        for(let x=0;x<cols;x++){
+          const cell = document.createElement('div');
+          cell.style.width='40px';
+          cell.style.height='40px';
+          cell.style.backgroundImage = `url(${imageURL})`;
+          cell.style.backgroundSize = `${cols*40}px ${rows*40}px`;
+          cell.style.backgroundPosition = `-${x*40}px -${y*40}px`;
+          cell.style.border='1px solid #333';
+          prev.appendChild(cell);
+        }
+      }
+    }('change', () => {
+      previewContainer.style.display = showPreviewCheckbox.checked ? 'block' : 'none';
+    });
 
-    correctOrder = [...Array(total).keys()];
+    generateBtn.addEventListener('click', () => {
+      if (!imageURL) return alert('Загрузите изображение!');
 
-    let pieces = [];
+      const cols = parseInt(document.getElementById('cols').value);
+      const rows = parseInt(document.getElementById('rows').value);
 
-    for (let i = 0; i < total; i++) {
-        const piece = document.createElement("div");
-        piece.className = "piece";
+      puzzle.innerHTML = '';
+      puzzle.style.gridTemplateColumns = `repeat(${cols}, 100px)`;
+      message.textContent = '';
 
-        const row = Math.floor(i / cols);
-        const col = i % cols;
+      const pieces = [];
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const piece = document.createElement('div');
+          piece.className = 'piece';
+          piece.style.backgroundImage = `url(${imageURL})`;
+          piece.style.backgroundSize = `${cols * 100}px ${rows * 100}px`;
+          piece.style.backgroundPosition = `-${x * 100}px -${y * 100}px`;
+          piece.dataset.correct = `${x}_${y}`;
+          piece.draggable = enableDrag.checked;
+          pieces.push(piece);
+        }
+      }
 
-        const x = -(col * (100 / (cols - 1))) + "%";
-        const y = -(row * (100 / (rows - 1))) + "%";
+      // перемешивание
+      pieces.sort(() => Math.random() - 0.5);
+      pieces.forEach(p => puzzle.appendChild(p));
+      shuffleBtn.disabled = false;
 
-        piece.style.backgroundImage = `url(${img.src})`;
-        piece.style.backgroundPosition = `${x} ${y}`;
+      enableDragAndDrop();
+    });
 
-        piece.dataset.correct = i;
+    shuffleBtn.addEventListener('click', () => {
+      const children = Array.from(puzzle.children);
+      children.sort(() => Math.random() - 0.5);
+      puzzle.innerHTML = '';
+      children.forEach(c => puzzle.appendChild(c));
+      message.textContent = '';
+    });
 
-        makeDraggable(piece);
+    enableDrag.addEventListener('change', () => {
+      Array.from(puzzle.children).forEach(p => p.draggable = enableDrag.checked);
+    });
 
-        pieces.push(piece);
+    function enableDragAndDrop() {
+      let dragged = null;
+
+      puzzle.ondragstart = e => {
+        if (!e.target.classList.contains('piece')) return;
+        dragged = e.target;
+      };
+
+      puzzle.ondragover = e => e.preventDefault();
+
+      puzzle.ondrop = e => {
+        if (!e.target.classList.contains('piece')) return;
+        const target = e.target;
+
+        const draggedNext = dragged.nextSibling;
+        const targetNext = target.nextSibling;
+
+        puzzle.insertBefore(dragged, targetNext);
+        puzzle.insertBefore(target, draggedNext);
+
+        checkSolved();
+      };
     }
 
-    pieces = shuffle(pieces);
-    pieces.forEach(p => puzzle.appendChild(p));
-}
+    function checkSolved() {
+      const items = Array.from(puzzle.children);
+      let solved = true;
 
-function shuffle(arr) {
-    return arr.sort(() => Math.random() - 0.5);
-}
+      items.forEach((p, i) => {
+        const x = i % parseInt(document.getElementById('cols').value);
+        const y = Math.floor(i / parseInt(document.getElementById('cols').value));
+        if (p.dataset.correct !== `${x}_${y}`) solved = false;
+      });
 
-function makeDraggable(piece) {
-    piece.draggable = true;
-
-    piece.addEventListener("dragstart", e => {
-        e.dataTransfer.setData("index", [...piece.parentNode.children].indexOf(piece));
-        if (!hasStarted) startTimer();
-    });
-
-    piece.addEventListener("dragover", e => e.preventDefault());
-
-    piece.addEventListener("drop", e => {
-        e.preventDefault();
-
-        const puzzle = document.getElementById("puzzle");
-        const from = e.dataTransfer.getData("index");
-        const to = [...puzzle.children].indexOf(piece);
-
-        swapPieces(from, to);
-        checkCorrectPositions();
-    });
-}
-
-function swapPieces(i, j) {
-    const puzzle = document.getElementById("puzzle");
-    const pieces = [...puzzle.children];
-
-    if (i === j) return;
-
-    puzzle.insertBefore(pieces[i], pieces[j]);
-}
-
-function checkCorrectPositions() {
-    const pieces = [...document.getElementById("puzzle").children];
-    let solved = true;
-
-    pieces.forEach((p, i) => {
-        if (i == p.dataset.correct) {
-            p.style.border = "2px solid #00cc00";
-        } else {
-            p.style.border = "1px solid #cc0000";
-            solved = false;
-        }
-    });
-
-    if (solved) stopTimer();
-}
-
-function startTimer() {
-    hasStarted = true;
-    startTime = Date.now();
-
-    timerInterval = setInterval(() => {
-        const sec = Math.floor((Date.now() - startTime) / 1000);
-        document.getElementById("timer").textContent = "Время: " + sec + " сек";
-    }, 500);
-}
-
-function stopTimer() {
-    clearInterval(timerInterval);
-    const sec = Math.floor((Date.now() - startTime) / 1000);
-    document.getElementById("timer").textContent = "Пазл собран! Время: " + sec + " сек";
-}
-</script>
-
+      message.textContent = solved ? 'Пазл собран! 🎉' : '';
+    }
+  </script>
 </body>
 </html>
