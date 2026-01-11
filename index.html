@@ -50,7 +50,6 @@ body {
   border: 2px solid #444;
   margin: 1px;
   background-size: cover;
-  background-position: center;
 }
 </style>
 </head>
@@ -147,7 +146,7 @@ generateBtn.addEventListener('click', () => {
     piece.style.backgroundImage = `url(${imageURL})`;
     piece.style.backgroundSize = `${cols * 100}% ${rows * 100}%`;
     piece.style.backgroundPosition =
-      `${cols > 1 ? (c / (cols - 1)) * 100 : 0}% ${rows > 1 ? (r / (rows - 1)) * 100 : 0}%`;
+      `${(c / (cols - 1)) * 100}% ${(r / (rows - 1)) * 100}%`;
 
     piece.dataset.correct = i;
     makeDraggable(piece);
@@ -169,7 +168,7 @@ function shuffle() {
   message.textContent = '';
 }
 
-/* Drag & Drop */
+/* Drag */
 function makeDraggable(piece) {
   piece.draggable = true;
 
@@ -177,20 +176,36 @@ function makeDraggable(piece) {
     draggedPiece = piece;
     if (!started) startTimer();
   });
-
-  piece.addEventListener('dragover', e => e.preventDefault());
-
-  piece.addEventListener('drop', e => {
-    e.preventDefault();
-    if (draggedPiece && draggedPiece !== piece) {
-      swapPieces(draggedPiece, piece);
-      if (enableCheck.checked) checkPositions();
-      else if (isSolved()) stopTimer();
-    }
-  });
 }
 
-/* Безопасный swap */
+/* Drop строго по координатам */
+puzzle.addEventListener('dragover', e => e.preventDefault());
+
+puzzle.addEventListener('drop', e => {
+  e.preventDefault();
+  if (!draggedPiece) return;
+
+  const rect = puzzle.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+
+  const col = Math.floor(x / pieceWidth);
+  const row = Math.floor(y / pieceHeight);
+
+  if (col < 0 || col >= cols || row < 0 || row >= rows) return;
+
+  const targetIndex = row * cols + col;
+  const targetPiece = puzzle.children[targetIndex];
+
+  if (targetPiece && targetPiece !== draggedPiece) {
+    swapPieces(draggedPiece, targetPiece);
+
+    if (enableCheck.checked) checkPositions();
+    else if (isSolved()) stopTimer();
+  }
+});
+
+/* Swap */
 function swapPieces(a, b) {
   const aNext = a.nextSibling === b ? a : a.nextSibling;
   puzzle.insertBefore(b, a);
@@ -260,7 +275,7 @@ function renderPreview() {
     div.style.backgroundImage = `url(${imageURL})`;
     div.style.backgroundSize = `${cols * 100}% ${rows * 100}%`;
     div.style.backgroundPosition =
-      `${cols > 1 ? (c / (cols - 1)) * 100 : 0}% ${rows > 1 ? (r / (rows - 1)) * 100 : 0}%`;
+      `${(c / (cols - 1)) * 100}% ${(r / (rows - 1)) * 100}%`;
 
     previewPuzzle.appendChild(div);
   }
