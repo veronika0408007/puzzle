@@ -195,21 +195,29 @@ puzzle.addEventListener('drop', e => {
   if (col < 0 || col >= cols || row < 0 || row >= rows) return;
 
   const targetIndex = row * cols + col;
-  const targetPiece = puzzle.children[targetIndex];
 
-  if (targetPiece && targetPiece !== draggedPiece) {
-    swapPieces(draggedPiece, targetPiece);
+  movePieceToIndex(draggedPiece, targetIndex);
 
-    if (enableCheck.checked) checkPositions();
-    else if (isSolved()) stopTimer();
-  }
+  if (enableCheck.checked) checkPositions();
+  else if (isSolved()) stopTimer();
+
+  draggedPiece = null;
 });
 
-/* Swap */
-function swapPieces(a, b) {
-  const aNext = a.nextSibling === b ? a : a.nextSibling;
-  puzzle.insertBefore(b, a);
-  puzzle.insertBefore(a, aNext);
+/*/
+function movePieceToIndex(piece, targetIndex) {
+  const fromIndex = pieces.indexOf(piece);
+  if (fromIndex === -1 || fromIndex === targetIndex) return;
+
+  pieces.splice(fromIndex, 1);
+  pieces.splice(targetIndex, 0, piece);
+
+  redrawPuzzle();
+}
+
+function redrawPuzzle() {
+  puzzle.innerHTML = '';
+  pieces.forEach(p => puzzle.appendChild(p));
 }
 
 /* Проверка */
