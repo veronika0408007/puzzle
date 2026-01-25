@@ -10,18 +10,65 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 20px;
+    padding: 18px;
     margin: 0;
     min-height: 100vh;
     background: #f5f5f5;
   }
 
-  #controls {
+  #topRow {
+    width: 100%;
+    max-width: 1100px;
     display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-    margin-bottom: 20px;
+    gap: 12px;
+    align-items: flex-start;
+  }
+
+  #menu {
+    width: 220px;
+    background: #fff;
+    padding: 10px;
+    border-radius: 8px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.06);
+    box-sizing: border-box;
+  }
+
+  #menu h3 { margin: 6px 0 8px; font-size: 14px; }
+  .presetList { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .presetItem {
+    border: 2px solid transparent;
+    border-radius: 6px;
+    overflow: hidden;
+    cursor: pointer;
+    background: #f6f6f6;
+  }
+  .presetItem.selected { border-color: #2196f3; box-shadow: 0 4px 12px rgba(33,150,243,0.12); }
+  .presetItem img { display:block; width:100%; height:64px; object-fit:cover; }
+
+  .menu-controls { margin-top:10px; display:flex; flex-direction:column; gap:8px; }
+  .presetSizes { display:flex; gap:6px; flex-wrap:wrap; }
+  .presetSizes button { padding:6px 8px; border-radius:6px; border:1px solid #ddd; background:#fff; cursor:pointer; }
+  .presetSizes button.active { background:#2196f3; color:#fff; border-color: #1976d2; }
+
+  #controls {
+    flex: 1;
+    background: #fff;
+    padding: 10px;
+    border-radius: 8px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.06);
+    display:flex;
+    gap:8px;
     align-items: center;
+    flex-wrap:wrap;
+  }
+
+  #puzzleArea {
+    margin-top: 14px;
+    width: 100%;
+    max-width: 1100px;
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
   }
 
   #puzzle {
@@ -110,8 +157,8 @@
     background: #fff;
     padding: 22px;
     border-radius: 8px;
-    max-width: 90%;
-    width: 420px;
+    max-width: 95%;
+    width: 460px;
     text-align: center;
     box-shadow: 0 10px 30px rgba(0,0,0,0.3);
   }
@@ -127,17 +174,24 @@
 
   #overlay .modal .actions {
     display:flex;
-    gap: 8px;
+    gap: 10px;
     justify-content: center;
+    flex-wrap:wrap;
   }
 
-  button {
+  .btn {
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 1px solid #ddd;
+    background: #fff;
     cursor: pointer;
   }
+  .btn.primary { background:#2196f3; color:#fff; border-color:#1976d2; }
+  .btn.warn { background:#ff7043; color:#fff; border-color:#e64a19; }
 
-  @media (max-width: 520px) {
-    #controls { gap: 6px; }
-    .modal { width: 95%; padding: 14px; }
+  @media (max-width: 980px) {
+    #topRow { flex-direction: column; align-items: stretch; }
+    #menu { width: 100%; order: 2; }
   }
 </style>
 </head>
@@ -146,29 +200,58 @@
 
 <h1>Виртуальный пазл</h1>
 
-<div id="controls">
-  <input type="file" id="imageUpload" accept="image/*">
-  <label>Ширина:
-    <input type="number" id="cols" min="1" max="20" value="5" style="width:60px">
-  </label>
-  <label>Высота:
-    <input type="number" id="rows" min="1" max="20" value="6" style="width:60px">
-  </label>
-  <label>
-    <input type="checkbox" id="enableCheck" checked>
-    Проверять позиции деталей
-  </label>
-  <button id="generate">Создать пазл</button>
-  <button id="shuffleBtn" disabled>Перемешать</button>
-  <button id="previewBtn">Показать картинку</button>
+<div id="topRow">
+  <div id="menu" aria-label="Меню выбора изображения и размеров">
+    <h3>Выберите картинку</h3>
+    <div class="presetList" id="presetList">
+      <!-- items injected by JS -->
+    </div>
+
+    <div class="menu-controls">
+      <h3>Размер (предустановки)</h3>
+      <div class="presetSizes" id="presetSizes">
+        <button data-cols="3" data-rows="3">3 × 3</button>
+        <button data-cols="5" data-rows="6" class="active">5 × 6</button>
+        <button data-cols="8" data-rows="6">8 × 6</button>
+        <button data-cols="10" data-rows="8">10 × 8</button>
+      </div>
+
+      <div style="display:flex; gap:8px; align-items:center;">
+        <label>Пользовательский:
+          <input type="number" id="cols" min="1" max="30" value="5" style="width:60px; margin-left:6px">
+          ×
+          <input type="number" id="rows" min="1" max="30" value="6" style="width:60px; margin-left:6px">
+        </label>
+      </div>
+
+      <div style="display:flex; gap:6px;">
+        <button id="generate" class="btn primary">Создать пазл</button>
+        <button id="useUploaded" class="btn">Использовать загруженное</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="controls">
+    <input type="file" id="imageUpload" accept="image/*" title="Загрузить свою картинку">
+    <label style="display:flex;align-items:center;gap:6px;">
+      <input type="checkbox" id="enableCheck" checked>
+      Проверять позиции деталей
+    </label>
+    <button id="shuffleBtn" class="btn" disabled>Перемешать</button>
+    <button id="previewBtn" class="btn">Показать картинку</button>
+    <div style="margin-left:auto; font-size:13px; color:#444">Подсказка: перетаскивайте плитки или кликайте чтобы обменять</div>
+  </div>
 </div>
 
-<div id="previewContainer">
-  <h3>Как должно выглядеть:</h3>
-  <div id="previewPuzzle"></div>
+<div id="puzzleArea">
+  <div id="previewContainer" style="display:none;">
+    <h3>Как должно выглядеть:</h3>
+    <div id="previewPuzzle"></div>
+  </div>
+
+  <div id="puzzle" aria-label="Поле пазла"></div>
 </div>
 
-<div id="puzzle" aria-label="Поле пазла"></div>
 <div id="message" aria-live="polite"></div>
 <h3 id="timer">Время: 0:00:000 </h3>
 
@@ -178,401 +261,478 @@
     <h2 id="overlayTitle">Ура! Пазл собран 🎉</h2>
     <p id="overlayTime">Время: 0:00:000</p>
     <div class="actions">
-      <button id="overlayOk">ОК</button>
-      <button id="overlayShuffle">Перемешать</button>
+      <button id="overlayShuffle" class="btn">Перемешать</button>
+      <button id="overlayNew" class="btn primary">Создать новый пазл</button>
+      <button id="overlayClose" class="btn">Закрыть</button>
     </div>
   </div>
 </div>
 
 <script>
-  const imgInput = document.getElementById('imageUpload');
-  const generateBtn = document.getElementById('generate');
-  const shuffleBtn = document.getElementById('shuffleBtn');
-  const previewBtn = document.getElementById('previewBtn');
-  const enableCheck = document.getElementById('enableCheck');
-  const puzzle = document.getElementById('puzzle');
-  const previewContainer = document.getElementById('previewContainer');
-  const previewPuzzle = document.getElementById('previewPuzzle');
-  const message = document.getElementById('message');
-  const timerDisplay = document.getElementById('timer');
+/* ========== Подготовка пресетов ========== */
+const presetImages = [
+  { id: 'preset1', title: 'Горы', url: 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?q=80&w=800&auto=format&fit=crop&ixlib=rb-4.0.3&s=4f6b44d0b4f3c5a5f8a800736bb0c5fb' },
+  { id: 'preset2', title: 'Город', url: 'https://images.unsplash.com/photo-1491553895911-0055eca6402d?q=80&w=800&auto=format&fit=crop&ixlib=rb-4.0.3&s=96c5dd2a3e5c8b3a5a1a0621d5cf72ea' },
+  { id: 'preset3', title: 'Птица', url: 'https://images.unsplash.com/photo-1507149833265-60c372daea22?q=80&w=800&auto=format&fit=crop&ixlib=rb-4.0.3&s=2b9e7cfb9d4b3d28a9b8b8f6a6e8a3cc' },
+  { id: 'preset4', title: 'Абстракт', url: 'https://images.unsplash.com/photo-1504198453319-5ce911bafcde?q=80&w=800&auto=format&fit=crop&ixlib=rb-4.0.3&s=0a9d7d4b4b5e8d3b4f7e4a6b9c6d5f2f' }
+];
 
-  const overlay = document.getElementById('overlay');
-  const overlayTime = document.getElementById('overlayTime');
-  const overlayOk = document.getElementById('overlayOk');
-  const overlayShuffle = document.getElementById('overlayShuffle');
+const presetList = document.getElementById('presetList');
+const presetSizes = document.getElementById('presetSizes');
 
-  let imageURL = '';
-  let cols = 5, rows = 6;
-  let pieceWidth = 100, pieceHeight = 100;
-  let cells = [];
-  let started = false;
-  let startTime = null;
-  let timer = null;
-  let pieceIdCounter = 0;
-  let solvedAlready = false; // prevent multiple overlays
+let selectedPreset = null;
+let uploadedImageURL = '';
+let imageURL = ''; // current image to use
+let cols = 5, rows = 6;
+let pieceWidth = 100, pieceHeight = 100;
+let cells = [];
+let started = false;
+let startTime = null;
+let timer = null;
+let pieceIdCounter = 0;
+let solvedAlready = false;
 
-  /* ===== ЗАГРУЗКА ИЗОБРАЖЕНИЯ ===== */
-  imgInput.addEventListener('change', e => {
-    if (e.target.files && e.target.files[0]) {
-      imageURL = URL.createObjectURL(e.target.files[0]);
-    }
+/* Inject preset thumbnails */
+presetImages.forEach(p => {
+  const el = document.createElement('div');
+  el.className = 'presetItem';
+  el.dataset.id = p.id;
+  el.title = p.title;
+  el.innerHTML = `<img src="${p.url}" alt="${p.title}"><div style="padding:6px;font-size:12px;text-align:center;">${p.title}</div>`;
+  el.addEventListener('click', () => {
+    document.querySelectorAll('.presetItem').forEach(i => i.classList.remove('selected'));
+    el.classList.add('selected');
+    selectedPreset = p;
+    imageURL = p.url;
   });
+  presetList.appendChild(el);
+});
 
-  /* ===== СОЗДАНИЕ ПАЗЛА ===== */
-  generateBtn.addEventListener('click', () => {
-    if (!imageURL) return alert('Загрузите изображение');
+/* Select first preset by default */
+if (presetList.firstChild) {
+  presetList.firstChild.click();
+}
 
-    cols = Math.max(1, Math.min(20, +document.getElementById('cols').value || 1));
-    rows = Math.max(1, Math.min(20, +document.getElementById('rows').value || 1));
-
-    const canvasSize = 500;
-    pieceWidth = Math.floor(canvasSize / cols);
-    pieceHeight = Math.floor(canvasSize / rows);
-
-    puzzle.innerHTML = '';
-    cells = [];
-    pieceIdCounter = 0;
-    solvedAlready = false;
-
-    puzzle.style.display = 'grid';
-    puzzle.style.gridTemplateColumns = `repeat(${cols}, ${pieceWidth}px)`;
-    puzzle.style.gridTemplateRows = `repeat(${rows}, ${pieceHeight}px)`;
-
-    for (let i = 0; i < cols * rows; i++) {
-      const cell = document.createElement('div');
-      cell.className = 'cell';
-      cell.style.width = pieceWidth + 'px';
-      cell.style.height = pieceHeight + 'px';
-      cell.dataset.index = i;
-
-      cell.addEventListener('dragover', e => {
-        e.preventDefault();
-        cell.classList.add('drop-target');
-      });
-      cell.addEventListener('dragleave', () => cell.classList.remove('drop-target'));
-      cell.addEventListener('drop', onDropOnCell);
-
-      const piece = document.createElement('div');
-      piece.className = 'piece';
-      piece.draggable = true;
-      piece.id = 'piece-' + (pieceIdCounter++);
-
-      const r = Math.floor(i / cols);
-      const c = i % cols;
-
-      piece.style.backgroundImage = `url(${imageURL})`;
-      piece.style.backgroundSize = `${cols * pieceWidth}px ${rows * pieceHeight}px`;
-      piece.style.backgroundPosition = `-${c * pieceWidth}px -${r * pieceHeight}px`;
-      piece.dataset.correct = i;
-
-      piece.addEventListener('dragstart', e => {
-        e.dataTransfer.setData('text/plain', piece.id);
-        piece.classList.add('dragging');
-        if (!started) startTimer();
-      });
-      piece.addEventListener('dragend', () => {
-        piece.classList.remove('dragging');
-        document.querySelectorAll('.cell.drop-target').forEach(el => el.classList.remove('drop-target'));
-      });
-
-      piece.addEventListener('click', e => {
-        e.stopPropagation();
-        toggleSelect(piece);
-      });
-
-      piece.addEventListener('touchstart', onTouchStart, {passive:false});
-      piece.addEventListener('touchmove', onTouchMove, {passive:false});
-      piece.addEventListener('touchend', onTouchEnd);
-
-      cell.appendChild(piece);
-      cells.push(cell);
-      puzzle.appendChild(cell);
-    }
-
-    shuffle();
-    shuffleBtn.disabled = false;
-    resetTimer();
-    message.textContent = '';
+/* Preset size buttons */
+presetSizes.querySelectorAll('button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    presetSizes.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const c = +btn.dataset.cols;
+    const r = +btn.dataset.rows;
+    document.getElementById('cols').value = c;
+    document.getElementById('rows').value = r;
   });
+});
 
-  /* ===== ПЕРЕМЕШИВАНИЕ ===== */
-  shuffleBtn.addEventListener('click', () => {
-    shuffle();
-    solvedAlready = false;
-    hideOverlay();
-    resetTimer();
-    message.textContent = '';
-  });
+/* ===== Элементы управления основной области ===== */
+const imgInput = document.getElementById('imageUpload');
+const generateBtn = document.getElementById('generate');
+const useUploaded = document.getElementById('useUploaded');
+const shuffleBtn = document.getElementById('shuffleBtn');
+const previewBtn = document.getElementById('previewBtn');
+const enableCheck = document.getElementById('enableCheck');
+const puzzle = document.getElementById('puzzle');
+const previewContainer = document.getElementById('previewContainer');
+const previewPuzzle = document.getElementById('previewPuzzle');
+const message = document.getElementById('message');
+const timerDisplay = document.getElementById('timer');
 
-  function shuffle() {
-    const pieces = cells.map(c => c.firstChild);
-    // Fisher-Yates
-    for (let i = pieces.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [pieces[i], pieces[j]] = [pieces[j], pieces[i]];
-    }
-    cells.forEach((cell, i) => cell.appendChild(pieces[i]));
-    document.querySelectorAll('.piece').forEach(p => p.style.border = '2px solid transparent');
-    message.textContent = '';
+const overlay = document.getElementById('overlay');
+const overlayTime = document.getElementById('overlayTime');
+const overlayShuffle = document.getElementById('overlayShuffle');
+const overlayNew = document.getElementById('overlayNew');
+const overlayClose = document.getElementById('overlayClose');
+
+imgInput.addEventListener('change', e => {
+  if (e.target.files && e.target.files[0]) {
+    // revoke previous if exists
+    if (uploadedImageURL) URL.revokeObjectURL(uploadedImageURL);
+    uploadedImageURL = URL.createObjectURL(e.target.files[0]);
+    imageURL = uploadedImageURL;
+    // mark none selected in presets
+    document.querySelectorAll('.presetItem').forEach(i => i.classList.remove('selected'));
+    selectedPreset = null;
+    message.textContent = 'Загружено пользовательское изображение. Нажмите "Создать пазл".';
   }
+});
 
-  /* ===== DROP на ячейку ===== */
-  function onDropOnCell(e) {
-    e.preventDefault();
-    this.classList.remove('drop-target');
-    const draggedId = e.dataTransfer.getData('text/plain');
-    const dragged = document.getElementById(draggedId);
-    if (!dragged) return;
+/* Use uploaded button (quick apply) */
+useUploaded.addEventListener('click', () => {
+  if (!uploadedImageURL) return alert('Сначала загрузите изображение через "Загрузить свою картинку".');
+  imageURL = uploadedImageURL;
+  document.querySelectorAll('.presetItem').forEach(i => i.classList.remove('selected'));
+  selectedPreset = null;
+  message.textContent = 'Используется загруженная картинка. Нажмите "Создать пазл".';
+});
 
-    const targetPiece = this.firstChild;
-    const sourceCell = dragged.parentElement;
+/* ===== СОЗДАНИЕ ПАЗЛА ===== */
+generateBtn.addEventListener('click', () => {
+  if (!imageURL) return alert('Выберите или загрузите изображение в меню слева.');
+  cols = Math.max(1, Math.min(30, +document.getElementById('cols').value || 1));
+  rows = Math.max(1, Math.min(30, +document.getElementById('rows').value || 1));
 
-    if (sourceCell === this) return;
+  createPuzzle(imageURL, cols, rows);
+});
 
-    sourceCell.appendChild(targetPiece);
-    this.appendChild(dragged);
+/* createPuzzle - основной конструктор */
+function createPuzzle(imgSrc, c, r) {
+  cols = c; rows = r;
+  // fixed canvas used to compute background sizes
+  const canvasSize = 500;
+  pieceWidth = Math.floor(canvasSize / cols);
+  pieceHeight = Math.floor(canvasSize / rows);
 
-    dragged.classList.remove('selected', 'dragging');
+  puzzle.innerHTML = '';
+  cells = [];
+  pieceIdCounter = 0;
+  solvedAlready = false;
 
-    // если пользователь включил проверку — показываем границы и вызываем overlay при успехе
-    if (enableCheck.checked) checkPositions();
-    else if (isSolved()) finishPuzzle();
-  }
+  puzzle.style.gridTemplateColumns = `repeat(${cols}, ${pieceWidth}px)`;
+  puzzle.style.gridTemplateRows = `repeat(${rows}, ${pieceHeight}px)`;
 
-  /* ===== ВЫДЕЛЕНИЕ КЛИКОМ ===== */
-  let selectedPiece = null;
-  function toggleSelect(piece) {
-    if (selectedPiece) selectedPiece.classList.remove('selected');
-    if (selectedPiece === piece) {
-      selectedPiece = null;
-    } else {
-      selectedPiece = piece;
-      piece.classList.add('selected');
-    }
-    if (!started && selectedPiece) startTimer();
-  }
+  for (let i = 0; i < cols * rows; i++) {
+    const cell = document.createElement('div');
+    cell.className = 'cell';
+    cell.style.width = pieceWidth + 'px';
+    cell.style.height = pieceHeight + 'px';
+    cell.dataset.index = i;
 
-  /* ===== КЛИК ПО ЯЧЕЙКЕ (обмен) ===== */
-  puzzle.addEventListener('click', e => {
-    const cell = e.target.closest('.cell');
-    if (!cell || !selectedPiece) return;
+    cell.addEventListener('dragover', e => {
+      e.preventDefault();
+      cell.classList.add('drop-target');
+    });
+    cell.addEventListener('dragleave', () => cell.classList.remove('drop-target'));
+    cell.addEventListener('drop', onDropOnCell);
 
-    const targetPiece = cell.firstChild;
-    const sourceCell = selectedPiece.parentElement;
+    const piece = document.createElement('div');
+    piece.className = 'piece';
+    piece.draggable = true;
+    piece.id = 'piece-' + (pieceIdCounter++);
 
-    if (targetPiece === selectedPiece) return;
+    const rr = Math.floor(i / cols);
+    const cc = i % cols;
 
-    sourceCell.appendChild(targetPiece);
-    cell.appendChild(selectedPiece);
+    piece.style.backgroundImage = `url(${imgSrc})`;
+    piece.style.backgroundSize = `${cols * pieceWidth}px ${rows * pieceHeight}px`;
+    piece.style.backgroundPosition = `-${cc * pieceWidth}px -${rr * pieceHeight}px`;
+    piece.dataset.correct = i;
 
-    selectedPiece.classList.remove('selected');
-    selectedPiece = null;
-
-    if (enableCheck.checked) checkPositions();
-    else if (isSolved()) finishPuzzle();
-  });
-
-  /* ===== ПРОВЕРКА ===== */
-  function checkPositions() {
-    let solved = true;
-
-    cells.forEach((cell, i) => {
-      const piece = cell.firstChild;
-      if (+piece.dataset.correct === i) {
-        piece.style.border = '2px solid green';
-      } else {
-        piece.style.border = '2px solid red';
-        solved = false;
-      }
+    piece.addEventListener('dragstart', e => {
+      e.dataTransfer.setData('text/plain', piece.id);
+      piece.classList.add('dragging');
+      if (!started) startTimer();
+    });
+    piece.addEventListener('dragend', () => {
+      piece.classList.remove('dragging');
+      document.querySelectorAll('.cell.drop-target').forEach(el => el.classList.remove('drop-target'));
     });
 
-    if (solved) finishPuzzle();
+    piece.addEventListener('click', e => {
+      e.stopPropagation();
+      toggleSelect(piece);
+    });
+
+    piece.addEventListener('touchstart', onTouchStart, {passive:false});
+    piece.addEventListener('touchmove', onTouchMove, {passive:false});
+    piece.addEventListener('touchend', onTouchEnd);
+
+    cell.appendChild(piece);
+    cells.push(cell);
+    puzzle.appendChild(cell);
   }
 
-  function isSolved() {
-    return cells.every((cell, i) =>
-      +cell.firstChild.dataset.correct === i
-    );
+  shuffle();
+  shuffleBtn.disabled = false;
+  resetTimer();
+  message.textContent = 'Пазл создан. Начните собирать!';
+  // hide preview so user focuses on puzzle
+  previewContainer.style.display = 'none';
+  previewBtn.textContent = 'Показать картинку';
+}
+
+/* ===== ПЕРЕМЕШИВАНИЕ ===== */
+shuffleBtn.addEventListener('click', () => {
+  shuffle();
+  solvedAlready = false;
+  hideOverlay();
+  resetTimer();
+  message.textContent = 'Пазл перемешан';
+});
+
+function shuffle() {
+  if (!cells.length) return;
+  const pieces = cells.map(c => c.firstChild);
+  for (let i = pieces.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pieces[i], pieces[j]] = [pieces[j], pieces[i]];
   }
+  cells.forEach((cell, i) => cell.appendChild(pieces[i]));
+  document.querySelectorAll('.piece').forEach(p => p.style.border = '2px solid transparent');
+}
 
-  /* ===== ФИНИШ (показ overlay) ===== */
-  function finishPuzzle() {
-    if (solvedAlready) return;
-    solvedAlready = true;
+/* ===== DROP на ячейку ===== */
+function onDropOnCell(e) {
+  e.preventDefault();
+  this.classList.remove('drop-target');
+  const draggedId = e.dataTransfer.getData('text/plain');
+  const dragged = document.getElementById(draggedId);
+  if (!dragged) return;
 
-    stopTimer();
-    message.textContent = 'Пазл собран! 🎉';
+  const targetPiece = this.firstChild;
+  const sourceCell = dragged.parentElement;
 
-    // Показать overlay с итоговым временем
-    const formatted = formatElapsedTime();
-    overlayTime.textContent = `Время: ${formatted}`;
-    showOverlay();
+  if (sourceCell === this) return;
+
+  sourceCell.appendChild(targetPiece);
+  this.appendChild(dragged);
+
+  dragged.classList.remove('selected', 'dragging');
+
+  if (enableCheck.checked) checkPositions();
+  else if (isSolved()) finishPuzzle();
+}
+
+/* ===== ВЫДЕЛЕНИЕ КЛИКОМ ===== */
+let selectedPiece = null;
+function toggleSelect(piece) {
+  if (selectedPiece) selectedPiece.classList.remove('selected');
+  if (selectedPiece === piece) {
+    selectedPiece = null;
+  } else {
+    selectedPiece = piece;
+    piece.classList.add('selected');
   }
+  if (!started && selectedPiece) startTimer();
+}
 
-  /* ===== Показ / скрытие overlay ===== */
-  function showOverlay() {
-    overlay.style.display = 'flex';
-    overlay.setAttribute('aria-hidden', 'false');
-    // блокируем взаимодействие с пазлом (overlay перекрывает всё)
-    document.body.style.overflow = 'hidden';
-  }
+/* ===== КЛИК ПО ЯЧЕЙКЕ (обмен) ===== */
+puzzle.addEventListener('click', e => {
+  const cell = e.target.closest('.cell');
+  if (!cell || !selectedPiece) return;
 
-  function hideOverlay() {
-    overlay.style.display = 'none';
-    overlay.setAttribute('aria-hidden', 'true');
-    document.body.style.overflow = '';
-  }
+  const targetPiece = cell.firstChild;
+  const sourceCell = selectedPiece.parentElement;
 
-  overlayOk.addEventListener('click', () => {
-    hideOverlay();
+  if (targetPiece === selectedPiece) return;
+
+  sourceCell.appendChild(targetPiece);
+  cell.appendChild(selectedPiece);
+
+  selectedPiece.classList.remove('selected');
+  selectedPiece = null;
+
+  if (enableCheck.checked) checkPositions();
+  else if (isSolved()) finishPuzzle();
+});
+
+/* ===== ПРОВЕРКА ===== */
+function checkPositions() {
+  let solved = true;
+
+  cells.forEach((cell, i) => {
+    const piece = cell.firstChild;
+    if (+piece.dataset.correct === i) {
+      piece.style.border = '2px solid green';
+    } else {
+      piece.style.border = '2px solid red';
+      solved = false;
+    }
   });
 
-  overlayShuffle.addEventListener('click', () => {
-    hideOverlay();
-    shuffle();
-    resetTimer();
-    solvedAlready = false;
-    message.textContent = '';
-  });
+  if (solved) finishPuzzle();
+}
 
-  /* ===== ТАЙМЕР ===== */
-  function startTimer() {
-    if (started) return;
-    started = true;
-    startTime = performance.now();
+function isSolved() {
+  return cells.length && cells.every((cell, i) =>
+    +cell.firstChild.dataset.correct === i
+  );
+}
 
-    timer = setInterval(() => {
-      const t = performance.now() - startTime;
-      const ms = Math.floor(t % 1000).toString().padStart(3, '0');
-      const sec = Math.floor(t / 1000) % 60;
-      const min = Math.floor(t / 60000);
+/* ===== ФИНИШ (показ overlay) ===== */
+function finishPuzzle() {
+  if (solvedAlready) return;
+  solvedAlready = true;
 
-      timerDisplay.textContent =
-        `Время: ${min}:${sec.toString().padStart(2,'0')}:${ms}`;
-    }, 50);
-  }
+  stopTimer();
+  message.textContent = 'Пазл собран! 🎉';
 
-  function stopTimer() {
-    clearInterval(timer);
-  }
+  const formatted = formatElapsedTime();
+  overlayTime.textContent = `Время: ${formatted}`;
+  showOverlay();
+}
 
-  function resetTimer() {
-    clearInterval(timer);
-    started = false;
-    startTime = null;
-    timerDisplay.textContent = 'Время: 0:00:000';
-  }
+/* Overlay controls */
+function showOverlay() {
+  overlay.style.display = 'flex';
+  overlay.setAttribute('aria-hidden', 'false');
+  document.body.style.overflow = 'hidden';
+}
 
-  function formatElapsedTime() {
-    if (!startTime) return '0:00:000';
+function hideOverlay() {
+  overlay.style.display = 'none';
+  overlay.setAttribute('aria-hidden', 'true');
+  document.body.style.overflow = '';
+}
+
+overlayShuffle.addEventListener('click', () => {
+  hideOverlay();
+  shuffle();
+  resetTimer();
+  solvedAlready = false;
+  message.textContent = 'Пазл перемешан';
+});
+
+overlayClose.addEventListener('click', () => {
+  hideOverlay();
+});
+
+/* Создать новый пазл из overlay: показать меню (скролл к меню) */
+overlayNew.addEventListener('click', () => {
+  hideOverlay();
+  // Scroll to top and focus menu
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  const firstPreset = document.querySelector('.presetItem');
+  if (firstPreset) firstPreset.scrollIntoView({ block: 'center', behavior: 'smooth' });
+});
+
+/* ===== ТАЙМЕР ===== */
+function startTimer() {
+  if (started) return;
+  started = true;
+  startTime = performance.now();
+
+  timer = setInterval(() => {
     const t = performance.now() - startTime;
     const ms = Math.floor(t % 1000).toString().padStart(3, '0');
     const sec = Math.floor(t / 1000) % 60;
     const min = Math.floor(t / 60000);
-    return `${min}:${sec.toString().padStart(2,'0')}:${ms}`;
+
+    timerDisplay.textContent =
+      `Время: ${min}:${sec.toString().padStart(2,'0')}:${ms}`;
+  }, 50);
+}
+
+function stopTimer() {
+  clearInterval(timer);
+}
+
+function resetTimer() {
+  clearInterval(timer);
+  started = false;
+  startTime = null;
+  timerDisplay.textContent = 'Время: 0:00:000';
+}
+
+function formatElapsedTime() {
+  if (!startTime) return '0:00:000';
+  const t = performance.now() - startTime;
+  const ms = Math.floor(t % 1000).toString().padStart(3, '0');
+  const sec = Math.floor(t / 1000) % 60;
+  const min = Math.floor(t / 60000);
+  return `${min}:${sec.toString().padStart(2,'0')}:${ms}`;
+}
+
+/* ===== ПРЕВЬЮ — ТАК ЖЕ, КАК ПАЗЛ (СБОРКА) ===== */
+previewBtn.addEventListener('click', () => {
+  if (!imageURL) return alert('Выберите или загрузите изображение в меню слева.');
+
+  if (previewContainer.style.display === 'block') {
+    previewContainer.style.display = 'none';
+    previewBtn.textContent = 'Показать картинку';
+    return;
   }
 
-  /* ===== ПРЕВЬЮ — ТАК ЖЕ, КАК ПАЗЛ (СБОРКА) ===== */
-  previewBtn.addEventListener('click', () => {
-    if (!imageURL) return alert('Загрузите изображение');
+  const useCols = cols || Math.max(1, +document.getElementById('cols').value || 1);
+  const useRows = rows || Math.max(1, +document.getElementById('rows').value || 1);
+  const canvasSize = 500;
+  const pW = Math.floor(canvasSize / useCols);
+  const pH = Math.floor(canvasSize / useRows);
 
-    // Toggle visibility
-    if (previewContainer.style.display === 'block') {
-      previewContainer.style.display = 'none';
-      previewBtn.textContent = 'Показать картинку';
-      return;
-    }
+  previewPuzzle.innerHTML = '';
+  previewPuzzle.style.gridTemplateColumns = `repeat(${useCols}, ${pW}px)`;
+  previewPuzzle.style.gridTemplateRows = `repeat(${useRows}, ${pH}px)`;
 
-    const useCols = cols || Math.max(1, +document.getElementById('cols').value || 1);
-    const useRows = rows || Math.max(1, +document.getElementById('rows').value || 1);
-    const canvasSize = 500;
-    const pW = Math.floor(canvasSize / useCols);
-    const pH = Math.floor(canvasSize / useRows);
+  for (let i = 0; i < useCols * useRows; i++) {
+    const r = Math.floor(i / useCols);
+    const c = i % useCols;
 
-    previewPuzzle.innerHTML = '';
-    previewPuzzle.style.gridTemplateColumns = `repeat(${useCols}, ${pW}px)`;
-    previewPuzzle.style.gridTemplateRows = `repeat(${useRows}, ${pH}px)`;
-
-    for (let i = 0; i < useCols * useRows; i++) {
-      const r = Math.floor(i / useCols);
-      const c = i % useCols;
-
-      const pp = document.createElement('div');
-      pp.className = 'previewPiece';
-      pp.style.width = pW + 'px';
-      pp.style.height = pH + 'px';
-      pp.style.backgroundImage = `url(${imageURL})`;
-      pp.style.backgroundSize = `${useCols * pW}px ${useRows * pH}px`;
-      pp.style.backgroundPosition = `-${c * pW}px -${r * pH}px`;
-      previewPuzzle.appendChild(pp);
-    }
-
-    previewContainer.style.display = 'block';
-    previewBtn.textContent = 'Скрыть картинку';
-  });
-
-  /* ===== TOUCH-DRAG SUPPORT (для мобильных) ===== */
-  let touchDrag = {
-    piece: null,
-    srcCell: null,
-    currentTargetCell: null
-  };
-
-  function onTouchStart(e) {
-    e.preventDefault();
-    const piece = e.currentTarget;
-    touchDrag.piece = piece;
-    touchDrag.srcCell = piece.parentElement;
-    piece.classList.add('dragging');
-    if (!started) startTimer();
+    const pp = document.createElement('div');
+    pp.className = 'previewPiece';
+    pp.style.width = pW + 'px';
+    pp.style.height = pH + 'px';
+    pp.style.backgroundImage = `url(${imageURL})`;
+    pp.style.backgroundSize = `${useCols * pW}px ${useRows * pH}px`;
+    pp.style.backgroundPosition = `-${c * pW}px -${r * pH}px`;
+    previewPuzzle.appendChild(pp);
   }
 
-  function onTouchMove(e) {
-    if (!touchDrag.piece) return;
-    e.preventDefault();
-    const touch = e.changedTouches[0];
-    const el = document.elementFromPoint(touch.clientX, touch.clientY);
-    const cell = el ? el.closest('.cell') : null;
-    if (cell !== touchDrag.currentTargetCell) {
-      if (touchDrag.currentTargetCell) touchDrag.currentTargetCell.classList.remove('drop-target');
-      touchDrag.currentTargetCell = cell;
-      if (cell) cell.classList.add('drop-target');
-    }
+  previewContainer.style.display = 'block';
+  previewBtn.textContent = 'Скрыть картинку';
+});
+
+/* ===== TOUCH-DRAG SUPPORT (для мобильных) ===== */
+let touchDrag = {
+  piece: null,
+  srcCell: null,
+  currentTargetCell: null
+};
+
+function onTouchStart(e) {
+  e.preventDefault();
+  const piece = e.currentTarget;
+  touchDrag.piece = piece;
+  touchDrag.srcCell = piece.parentElement;
+  piece.classList.add('dragging');
+  if (!started) startTimer();
+}
+
+function onTouchMove(e) {
+  if (!touchDrag.piece) return;
+  e.preventDefault();
+  const touch = e.changedTouches[0];
+  const el = document.elementFromPoint(touch.clientX, touch.clientY);
+  const cell = el ? el.closest('.cell') : null;
+  if (cell !== touchDrag.currentTargetCell) {
+    if (touchDrag.currentTargetCell) touchDrag.currentTargetCell.classList.remove('drop-target');
+    touchDrag.currentTargetCell = cell;
+    if (cell) cell.classList.add('drop-target');
+  }
+}
+
+function onTouchEnd(e) {
+  if (!touchDrag.piece) return;
+  const piece = touchDrag.piece;
+  const targetCell = touchDrag.currentTargetCell;
+  piece.classList.remove('dragging');
+
+  if (targetCell && targetCell !== touchDrag.srcCell) {
+    const targetPiece = targetCell.firstChild;
+    const srcCell = touchDrag.srcCell;
+
+    srcCell.appendChild(targetPiece);
+    targetCell.appendChild(piece);
+
+    if (enableCheck.checked) checkPositions();
+    else if (isSolved()) finishPuzzle();
   }
 
-  function onTouchEnd(e) {
-    if (!touchDrag.piece) return;
-    const piece = touchDrag.piece;
-    const targetCell = touchDrag.currentTargetCell;
-    piece.classList.remove('dragging');
+  document.querySelectorAll('.cell.drop-target').forEach(el => el.classList.remove('drop-target'));
 
-    if (targetCell && targetCell !== touchDrag.srcCell) {
-      const targetPiece = targetCell.firstChild;
-      const srcCell = touchDrag.srcCell;
+  touchDrag.piece = null;
+  touchDrag.srcCell = null;
+  touchDrag.currentTargetCell = null;
+}
 
-      srcCell.appendChild(targetPiece);
-      targetCell.appendChild(piece);
-
-      if (enableCheck.checked) checkPositions();
-      else if (isSolved()) finishPuzzle();
-    }
-
-    document.querySelectorAll('.cell.drop-target').forEach(el => el.classList.remove('drop-target'));
-
-    touchDrag.piece = null;
-    touchDrag.srcCell = null;
-    touchDrag.currentTargetCell = null;
+/* Escape hides overlay */
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && overlay.style.display === 'flex') {
+    hideOverlay();
   }
+});
 
-  // Hide overlay if user presses Escape
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && overlay.style.display === 'flex') {
-      hideOverlay();
-    }
-  });
-
-  // Initial small hint
-  message.textContent = 'Создайте пазл, затем перетаскивайте или кликайте детали для обмена. Можно включить/отключить проверку.';
+/* Initial hint */
+message.textContent = 'Выберите картинку и размер в меню слева. Можно загрузить свою картинку.';
 </script>
 
 </body>
