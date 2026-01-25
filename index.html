@@ -82,7 +82,7 @@ body {
 
 <div id="puzzle"></div>
 <div id="message"></div>
-<h3 id="timer">Время: 0 сек</h3>
+<h3 id="timer">Время: 0 </h3>
 
 <script>
 const imgInput = document.getElementById('imageUpload');
@@ -106,14 +106,14 @@ let started = false;
 let startTime = null;
 let timer = null;
 
-/* ================= ЗАГРУЗКА ИЗОБРАЖЕНИЯ ================= */
+/* ===== ЗАГРУЗКА ИЗОБРАЖЕНИЯ ===== */
 imgInput.addEventListener('change', e => {
   if (e.target.files[0]) {
     imageURL = URL.createObjectURL(e.target.files[0]);
   }
 });
 
-/* ================= СОЗДАНИЕ ПАЗЛА ================= */
+/* ===== СОЗДАНИЕ ПАЗЛА ===== */
 generateBtn.addEventListener('click', () => {
   if (!imageURL) return alert('Загрузите изображение');
 
@@ -125,6 +125,7 @@ generateBtn.addEventListener('click', () => {
 
   puzzle.style.gridTemplateColumns = `repeat(${cols}, ${pieceWidth}px)`;
   puzzle.style.gridTemplateRows = `repeat(${rows}, ${pieceHeight}px)`;
+
   puzzle.innerHTML = '';
   pieces = [];
   selectedPiece = null;
@@ -139,16 +140,13 @@ generateBtn.addEventListener('click', () => {
     const c = i % cols;
 
     piece.style.backgroundImage = `url(${imageURL})`;
-    piece.style.backgroundSize = `${cols * 100}% ${rows * 100}%`;
+    piece.style.backgroundSize = `${pieceWidth * cols}px ${pieceHeight * rows}px`;
     piece.style.backgroundPosition =
-      `${(c / (cols - 1)) * 100}% ${(r / (rows - 1)) * 100}%`;
+      `-${c * pieceWidth}px -${r * pieceHeight}px`;
 
     piece.dataset.correct = i;
 
-    piece.addEventListener('click', e => {
-      e.stopPropagation();
-      selectPiece(piece);
-    });
+    piece.addEventListener('click', () => selectPiece(piece));
 
     pieces.push(piece);
   }
@@ -157,7 +155,7 @@ generateBtn.addEventListener('click', () => {
   resetTimer();
 });
 
-/* ================= ПЕРЕМЕШИВАНИЕ ================= */
+/* ===== ПЕРЕМЕШИВАНИЕ ===== */
 shuffleBtn.addEventListener('click', shuffle);
 
 function shuffle() {
@@ -166,19 +164,16 @@ function shuffle() {
   message.textContent = '';
 }
 
-/* ================= ВЫБОР ДЕТАЛИ ================= */
+/* ===== ВЫБОР ДЕТАЛИ ===== */
 function selectPiece(piece) {
-  if (selectedPiece) {
-    selectedPiece.classList.remove('selected');
-  }
-
+  if (selectedPiece) selectedPiece.classList.remove('selected');
   selectedPiece = piece;
   piece.classList.add('selected');
 
   if (!started) startTimer();
 }
 
-/* ================= КЛИК ПО ПОЛЮ ================= */
+/* ===== КЛИК ПО ПАЗЛУ ===== */
 puzzle.addEventListener('click', e => {
   if (!selectedPiece) return;
 
@@ -193,13 +188,10 @@ puzzle.addEventListener('click', e => {
 
   const targetIndex = row * cols + col;
   const fromIndex = pieces.indexOf(selectedPiece);
-
   if (fromIndex === targetIndex) return;
 
-  // меняем местами
-  const temp = pieces[targetIndex];
-  pieces[targetIndex] = selectedPiece;
-  pieces[fromIndex] = temp;
+  [pieces[fromIndex], pieces[targetIndex]] =
+  [pieces[targetIndex], pieces[fromIndex]];
 
   selectedPiece.classList.remove('selected');
   selectedPiece = null;
@@ -210,13 +202,13 @@ puzzle.addEventListener('click', e => {
   else if (isSolved()) finishPuzzle();
 });
 
-/* ================= ПЕРЕРИСОВКА ================= */
+/* ===== ПЕРЕРИСОВКА ===== */
 function redrawPuzzle() {
   puzzle.innerHTML = '';
   pieces.forEach(p => puzzle.appendChild(p));
 }
 
-/* ================= ПРОВЕРКА ================= */
+/* ===== ПРОВЕРКА ===== */
 function checkPositions() {
   let solved = true;
 
@@ -236,20 +228,27 @@ function isSolved() {
   return pieces.every((p, i) => +p.dataset.correct === i);
 }
 
-/* ================= ФИНИШ ================= */
+/* ===== ФИНИШ ===== */
 function finishPuzzle() {
   stopTimer();
   message.textContent = 'Пазл собран! 🎉';
 }
 
-/* ================= ТАЙМЕР ================= */
+/* ===== ТАЙМЕР (мм:сс:мс) ===== */
 function startTimer() {
   started = true;
-  startTime = Date.now();
+  startTime = performance.now();
+
   timer = setInterval(() => {
+    const t = performance.now() - startTime;
+
+    const ms = Math.floor(t % 1000).toString().padStart(3, '0');
+    const sec = Math.floor(t / 1000) % 60;
+    const min = Math.floor(t / 60000);
+
     timerDisplay.textContent =
-      'Время: ' + Math.floor((Date.now() - startTime) / 1000) + ' сек';
-  }, 500);
+      `Время: ${min}:${sec.toString().padStart(2,'0')}:${ms}`;
+  }, 50);
 }
 
 function stopTimer() {
@@ -259,10 +258,10 @@ function stopTimer() {
 function resetTimer() {
   clearInterval(timer);
   started = false;
-  timerDisplay.textContent = 'Время: 0 сек';
+  timerDisplay.textContent = 'Время: 0:00:000';
 }
 
-/* ================= ПРЕВЬЮ ================= */
+/* ===== ПРЕВЬЮ (ЧЁТКОЕ) ===== */
 previewBtn.addEventListener('click', () => {
   if (!imageURL) return alert('Загрузите изображение');
   renderPreview();
@@ -272,6 +271,7 @@ previewBtn.addEventListener('click', () => {
 function renderPreview() {
   previewPuzzle.innerHTML = '';
   previewPuzzle.style.width = pieceWidth * cols + 'px';
+  previewPuzzle.style.height = pieceHeight * rows + 'px';
 
   for (let i = 0; i < cols * rows; i++) {
     const div = document.createElement('div');
@@ -283,14 +283,15 @@ function renderPreview() {
     const c = i % cols;
 
     div.style.backgroundImage = `url(${imageURL})`;
-    div.style.backgroundSize = `${cols * 100}% ${rows * 100}%`;
+    div.style.backgroundSize = `${pieceWidth * cols}px ${pieceHeight * rows}px`;
     div.style.backgroundPosition =
-      `${(c / (cols - 1)) * 100}% ${(r / (rows - 1)) * 100}%`;
+      `-${c * pieceWidth}px -${r * pieceHeight}px`;
 
     previewPuzzle.appendChild(div);
   }
 }
 </script>
+
 
 </body>
 </html>
