@@ -97,10 +97,10 @@ const message = document.getElementById('message');
 const timerDisplay = document.getElementById('timer');
 
 let imageURL = '';
-let pieces = [];
 let cols = 5, rows = 6;
 let pieceWidth = 100, pieceHeight = 100;
 
+let cells = [];
 let selectedPiece = null;
 let started = false;
 let startTime = null;
@@ -123,32 +123,39 @@ generateBtn.addEventListener('click', () => {
   pieceWidth = Math.floor(500 / cols);
   pieceHeight = Math.floor(500 / rows);
 
+  puzzle.innerHTML = '';
+  cells = [];
+  selectedPiece = null;
+
+  puzzle.style.display = 'grid';
   puzzle.style.gridTemplateColumns = `repeat(${cols}, ${pieceWidth}px)`;
   puzzle.style.gridTemplateRows = `repeat(${rows}, ${pieceHeight}px)`;
 
-  puzzle.innerHTML = '';
-  pieces = [];
-  selectedPiece = null;
-
   for (let i = 0; i < cols * rows; i++) {
+    const cell = document.createElement('div');
+    cell.className = 'cell';
+    cell.style.width = pieceWidth + 'px';
+    cell.style.height = pieceHeight + 'px';
+
     const piece = document.createElement('div');
     piece.className = 'piece';
-    piece.style.width = pieceWidth + 'px';
-    piece.style.height = pieceHeight + 'px';
 
     const r = Math.floor(i / cols);
     const c = i % cols;
 
     piece.style.backgroundImage = `url(${imageURL})`;
-    piece.style.backgroundSize = `${pieceWidth * cols}px ${pieceHeight * rows}px`;
-    piece.style.backgroundPosition =
-      `-${c * pieceWidth}px -${r * pieceHeight}px`;
-
+    piece.style.backgroundSize = `${cols * pieceWidth}px ${rows * pieceHeight}px`;
+    piece.style.backgroundPosition = `-${c * pieceWidth}px -${r * pieceHeight}px`;
     piece.dataset.correct = i;
 
-    piece.addEventListener('click', () => selectPiece(piece));
+    piece.addEventListener('click', e => {
+      e.stopPropagation();
+      selectPiece(piece);
+    });
 
-    pieces.push(piece);
+    cell.appendChild(piece);
+    cells.push(cell);
+    puzzle.appendChild(cell);
   }
 
   shuffle();
@@ -159,8 +166,9 @@ generateBtn.addEventListener('click', () => {
 shuffleBtn.addEventListener('click', shuffle);
 
 function shuffle() {
+  const pieces = cells.map(c => c.firstChild);
   pieces.sort(() => Math.random() - 0.5);
-  redrawPuzzle();
+  cells.forEach((cell, i) => cell.appendChild(pieces[i]));
   message.textContent = '';
 }
 
@@ -173,50 +181,36 @@ function selectPiece(piece) {
   if (!started) startTimer();
 }
 
-/* ===== КЛИК ПО ПАЗЛУ ===== */
+/* ===== КЛИК ПО ЯЧЕЙКЕ ===== */
 puzzle.addEventListener('click', e => {
-  if (!selectedPiece) return;
+  const cell = e.target.closest('.cell');
+  if (!cell || !selectedPiece) return;
 
-  const rect = puzzle.getBoundingClientRect();
-  const x = e.clientX - rect.left;
-  const y = e.clientY - rect.top;
+  const targetPiece = cell.firstChild;
+  const sourceCell = selectedPiece.parentElement;
 
-  const col = Math.floor(x / pieceWidth);
-  const row = Math.floor(y / pieceHeight);
+  if (targetPiece === selectedPiece) return;
 
-  if (col < 0 || col >= cols || row < 0 || row >= rows) return;
-
-  const targetIndex = row * cols + col;
-  const fromIndex = pieces.indexOf(selectedPiece);
-  if (fromIndex === targetIndex) return;
-
-  [pieces[fromIndex], pieces[targetIndex]] =
-  [pieces[targetIndex], pieces[fromIndex]];
+  sourceCell.appendChild(targetPiece);
+  cell.appendChild(selectedPiece);
 
   selectedPiece.classList.remove('selected');
   selectedPiece = null;
-
-  redrawPuzzle();
 
   if (enableCheck.checked) checkPositions();
   else if (isSolved()) finishPuzzle();
 });
 
-/* ===== ПЕРЕРИСОВКА ===== */
-function redrawPuzzle() {
-  puzzle.innerHTML = '';
-  pieces.forEach(p => puzzle.appendChild(p));
-}
-
 /* ===== ПРОВЕРКА ===== */
 function checkPositions() {
   let solved = true;
 
-  pieces.forEach((p, i) => {
-    if (+p.dataset.correct === i) {
-      p.style.border = '2px solid green';
+  cells.forEach((cell, i) => {
+    const piece = cell.firstChild;
+    if (+piece.dataset.correct === i) {
+      piece.style.border = '2px solid green';
     } else {
-      p.style.border = '2px solid red';
+      piece.style.border = '2px solid red';
       solved = false;
     }
   });
@@ -225,7 +219,9 @@ function checkPositions() {
 }
 
 function isSolved() {
-  return pieces.every((p, i) => +p.dataset.correct === i);
+  return cells.every((cell, i) =>
+    +cell.firstChild.dataset.correct === i
+  );
 }
 
 /* ===== ФИНИШ ===== */
@@ -234,14 +230,13 @@ function finishPuzzle() {
   message.textContent = 'Пазл собран! 🎉';
 }
 
-/* ===== ТАЙМЕР (мм:сс:мс) ===== */
+/* ===== ТАЙМЕР ===== */
 function startTimer() {
   started = true;
   startTime = performance.now();
 
   timer = setInterval(() => {
     const t = performance.now() - startTime;
-
     const ms = Math.floor(t % 1000).toString().padStart(3, '0');
     const sec = Math.floor(t / 1000) % 60;
     const min = Math.floor(t / 60000);
@@ -261,37 +256,17 @@ function resetTimer() {
   timerDisplay.textContent = 'Время: 0:00:000';
 }
 
-/* ===== ПРЕВЬЮ (ЧЁТКОЕ) ===== */
+/* ===== ПРЕВЬЮ — ЦЕЛЬНАЯ КАРТИНКА ===== */
 previewBtn.addEventListener('click', () => {
   if (!imageURL) return alert('Загрузите изображение');
-  renderPreview();
+  previewPuzzle.innerHTML = '';
+  previewPuzzle.appendChild(Object.assign(new Image(), {
+    src: imageURL,
+    style: `width:${cols * pieceWidth}px`
+  }));
   previewContainer.style.display = 'block';
 });
-
-function renderPreview() {
-  previewPuzzle.innerHTML = '';
-  previewPuzzle.style.width = pieceWidth * cols + 'px';
-  previewPuzzle.style.height = pieceHeight * rows + 'px';
-
-  for (let i = 0; i < cols * rows; i++) {
-    const div = document.createElement('div');
-    div.className = 'previewPiece';
-    div.style.width = pieceWidth + 'px';
-    div.style.height = pieceHeight + 'px';
-
-    const r = Math.floor(i / cols);
-    const c = i % cols;
-
-    div.style.backgroundImage = `url(${imageURL})`;
-    div.style.backgroundSize = `${pieceWidth * cols}px ${pieceHeight * rows}px`;
-    div.style.backgroundPosition =
-      `-${c * pieceWidth}px -${r * pieceHeight}px`;
-
-    previewPuzzle.appendChild(div);
-  }
-}
 </script>
-
 
 </body>
 </html>
