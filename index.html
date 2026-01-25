@@ -6,51 +6,80 @@
 <title>Виртуальный пазл</title>
 
 <style>
-body {
-  font-family: Arial;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 20px;
-}
+  body {
+    font-family: Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+  }
 
-#controls {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-bottom: 20px;
-}
+  #controls {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+    align-items: center;
+  }
 
-#puzzle {
-  display: grid;
-  gap: 2px;
-  border: 2px solid #000;
-  padding: 5px;
-}
+  #puzzle {
+    display: grid;
+    gap: 2px;
+    border: 2px solid #000;
+    padding: 5px;
+    touch-action: none; /* для лучшей работы touch */
+  }
 
-.piece {
-  background-size: cover;
-  cursor: grab;
-  user-select: none;
-}
+  .cell {
+    position: relative;
+    overflow: hidden;
+    background: #eee;
+  }
 
-#message {
-  margin-top: 12px;
-  font-weight: bold;
-}
+  .piece {
+    width: 100%;
+    height: 100%;
+    background-size: cover;
+    cursor: grab;
+    user-select: none;
+    transition: transform 150ms ease, border-color 120ms;
+    box-sizing: border-box;
+    border: 2px solid transparent;
+  }
 
-#previewContainer {
-  margin-top: 15px;
-  display: none;
-  text-align: center;
-}
+  .piece.dragging {
+    opacity: 0.6;
+    cursor: grabbing;
+    transform: scale(1.02);
+    z-index: 10;
+  }
 
-.previewPiece {
-  display: inline-block;
-  border: 2px solid #444;
-  margin: 1px;
-  background-size: cover;
-}
+  .piece.selected {
+    outline: 3px dashed #666;
+  }
+
+  #message {
+    margin-top: 12px;
+    font-weight: bold;
+  }
+
+  #previewContainer {
+    margin-top: 15px;
+    display: none;
+    text-align: center;
+  }
+
+  .previewPiece {
+    display: inline-block;
+    border: 2px solid #444;
+    margin: 1px;
+    background-size: cover;
+  }
+
+  /* подсказка при dragover */
+  .cell.drop-target {
+    box-shadow: inset 0 0 0 3px rgba(0, 120, 215, 0.25);
+  }
 </style>
 </head>
 
@@ -61,10 +90,10 @@ body {
 <div id="controls">
   <input type="file" id="imageUpload" accept="image/*">
   <label>Ширина:
-    <input type="number" id="cols" min="1" max="20" value="1" style="width:60px">
+    <input type="number" id="cols" min="1" max="20" value="5" style="width:60px">
   </label>
   <label>Высота:
-    <input type="number" id="rows" min="1" max="20" value="1" style="width:60px">
+    <input type="number" id="rows" min="1" max="20" value="6" style="width:60px">
   </label>
   <label>
     <input type="checkbox" id="enableCheck" checked>
@@ -82,7 +111,7 @@ body {
 
 <div id="puzzle"></div>
 <div id="message"></div>
-<h3 id="timer">Время: 0 </h3>
+<h3 id="timer">Время: 0:00:000 </h3>
 
 <script>
 const imgInput = document.getElementById('imageUpload');
@@ -99,16 +128,15 @@ const timerDisplay = document.getElementById('timer');
 let imageURL = '';
 let cols = 5, rows = 6;
 let pieceWidth = 100, pieceHeight = 100;
-
 let cells = [];
-let selectedPiece = null;
 let started = false;
 let startTime = null;
 let timer = null;
+let pieceIdCounter = 0;
 
 /* ===== ЗАГРУЗКА ИЗОБРАЖЕНИЯ ===== */
 imgInput.addEventListener('change', e => {
-  if (e.target.files[0]) {
+  if (e.target.files && e.target.files[0]) {
     imageURL = URL.createObjectURL(e.target.files[0]);
   }
 });
@@ -117,28 +145,42 @@ imgInput.addEventListener('change', e => {
 generateBtn.addEventListener('click', () => {
   if (!imageURL) return alert('Загрузите изображение');
 
-  cols = +document.getElementById('cols').value;
-  rows = +document.getElementById('rows').value;
+  cols = Math.max(1, Math.min(20, +document.getElementById('cols').value || 1));
+  rows = Math.max(1, Math.min(20, +document.getElementById('rows').value || 1));
 
-  pieceWidth = Math.floor(500 / cols);
-  pieceHeight = Math.floor(500 / rows);
+  // Размер "холста" фиксируем 500x500 для расчёта фона, но сетка масштабируется
+  const canvasSize = 500;
+  pieceWidth = Math.floor(canvasSize / cols);
+  pieceHeight = Math.floor(canvasSize / rows);
 
   puzzle.innerHTML = '';
   cells = [];
-  selectedPiece = null;
+  pieceIdCounter = 0;
 
   puzzle.style.display = 'grid';
   puzzle.style.gridTemplateColumns = `repeat(${cols}, ${pieceWidth}px)`;
   puzzle.style.gridTemplateRows = `repeat(${rows}, ${pieceHeight}px)`;
 
+  // Создаем ячейки и детали
   for (let i = 0; i < cols * rows; i++) {
     const cell = document.createElement('div');
     cell.className = 'cell';
     cell.style.width = pieceWidth + 'px';
     cell.style.height = pieceHeight + 'px';
+    cell.dataset.index = i;
+
+    // обработчики для dragover/drop
+    cell.addEventListener('dragover', e => {
+      e.preventDefault();
+      cell.classList.add('drop-target');
+    });
+    cell.addEventListener('dragleave', () => cell.classList.remove('drop-target'));
+    cell.addEventListener('drop', onDropOnCell);
 
     const piece = document.createElement('div');
     piece.className = 'piece';
+    piece.draggable = true;
+    piece.id = 'piece-' + (pieceIdCounter++);
 
     const r = Math.floor(i / cols);
     const c = i % cols;
@@ -148,18 +190,38 @@ generateBtn.addEventListener('click', () => {
     piece.style.backgroundPosition = `-${c * pieceWidth}px -${r * pieceHeight}px`;
     piece.dataset.correct = i;
 
+    // drag events (desktop)
+    piece.addEventListener('dragstart', e => {
+      e.dataTransfer.setData('text/plain', piece.id);
+      piece.classList.add('dragging');
+      if (!started) startTimer();
+    });
+    piece.addEventListener('dragend', () => {
+      piece.classList.remove('dragging');
+      document.querySelectorAll('.cell.drop-target').forEach(el => el.classList.remove('drop-target'));
+    });
+
+    // click selection (fallback)
     piece.addEventListener('click', e => {
       e.stopPropagation();
-      selectPiece(piece);
+      // если клик на элемент — выделим и позволим клик по ячейке для обмена
+      toggleSelect(piece);
     });
+
+    // touch support (mobile)
+    piece.addEventListener('touchstart', onTouchStart, {passive:false});
+    piece.addEventListener('touchmove', onTouchMove, {passive:false});
+    piece.addEventListener('touchend', onTouchEnd);
 
     cell.appendChild(piece);
     cells.push(cell);
     puzzle.appendChild(cell);
   }
 
-  shuffle();
+  shuffle(); // перемешиваем при создании
+  shuffleBtn.disabled = false;
   resetTimer();
+  message.textContent = '';
 });
 
 /* ===== ПЕРЕМЕШИВАНИЕ ===== */
@@ -167,21 +229,57 @@ shuffleBtn.addEventListener('click', shuffle);
 
 function shuffle() {
   const pieces = cells.map(c => c.firstChild);
-  pieces.sort(() => Math.random() - 0.5);
+  // Fisher-Yates для качественного перемешивания
+  for (let i = pieces.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pieces[i], pieces[j]] = [pieces[j], pieces[i]];
+  }
   cells.forEach((cell, i) => cell.appendChild(pieces[i]));
+  // сброс обводок
+  document.querySelectorAll('.piece').forEach(p => p.style.border = '2px solid transparent');
   message.textContent = '';
 }
 
-/* ===== ВЫБОР ДЕТАЛИ ===== */
-function selectPiece(piece) {
-  if (selectedPiece) selectedPiece.classList.remove('selected');
-  selectedPiece = piece;
-  piece.classList.add('selected');
+/* ===== ПОМЕЩЕНИЕ ПРИ DROP ===== */
+function onDropOnCell(e) {
+  e.preventDefault();
+  this.classList.remove('drop-target');
+  const draggedId = e.dataTransfer.getData('text/plain');
+  const dragged = document.getElementById(draggedId);
+  if (!dragged) return;
 
-  if (!started) startTimer();
+  const targetPiece = this.firstChild;
+  const sourceCell = dragged.parentElement;
+
+  // если цель — та же ячейка, ничего не делаем
+  if (sourceCell === this) return;
+
+  // меняем местами элементы
+  sourceCell.appendChild(targetPiece);
+  this.appendChild(dragged);
+
+  // завершение: убрать выбор / класс
+  dragged.classList.remove('selected', 'dragging');
+  if (enableCheck.checked) checkPositions();
+  else if (isSolved()) finishPuzzle();
 }
 
-/* ===== КЛИК ПО ЯЧЕЙКЕ ===== */
+/* ===== ВЫДЕЛЕНИЕ ДЕТАЛИ КЛИКОМ ===== */
+let selectedPiece = null;
+function toggleSelect(piece) {
+  if (selectedPiece) selectedPiece.classList.remove('selected');
+  if (selectedPiece === piece) {
+    selectedPiece = null;
+  } else {
+    selectedPiece = piece;
+    piece.classList.add('selected');
+  }
+
+  // первый ход запускает таймер
+  if (!started && selectedPiece) startTimer();
+}
+
+/* ===== КЛИК ПО ЯЧЕЙКЕ ДЛЯ ОБМЕНА (при выделенной детали) ===== */
 puzzle.addEventListener('click', e => {
   const cell = e.target.closest('.cell');
   if (!cell || !selectedPiece) return;
@@ -232,6 +330,7 @@ function finishPuzzle() {
 
 /* ===== ТАЙМЕР ===== */
 function startTimer() {
+  if (started) return;
   started = true;
   startTime = performance.now();
 
@@ -260,12 +359,71 @@ function resetTimer() {
 previewBtn.addEventListener('click', () => {
   if (!imageURL) return alert('Загрузите изображение');
   previewPuzzle.innerHTML = '';
-  previewPuzzle.appendChild(Object.assign(new Image(), {
-    src: imageURL,
-    style: `width:${cols * pieceWidth}px`
-  }));
+  const img = new Image();
+  img.src = imageURL;
+  img.style.width = `${cols * pieceWidth}px`;
+  previewPuzzle.appendChild(img);
   previewContainer.style.display = 'block';
 });
+
+/* ===== TOUCH-DRAG SUPPORT (для мобильных) ===== */
+let touchDrag = {
+  piece: null,
+  srcCell: null,
+  currentTargetCell: null
+};
+
+function onTouchStart(e) {
+  e.preventDefault(); // чтобы не скроллить страницу при перетаскивании
+  const touch = e.changedTouches[0];
+  const piece = e.currentTarget;
+  touchDrag.piece = piece;
+  touchDrag.srcCell = piece.parentElement;
+  piece.classList.add('dragging');
+
+  // начать таймер, если ещё не начали
+  if (!started) startTimer();
+}
+
+function onTouchMove(e) {
+  if (!touchDrag.piece) return;
+  e.preventDefault();
+  const touch = e.changedTouches[0];
+  // элемент под пальцем
+  const el = document.elementFromPoint(touch.clientX, touch.clientY);
+  const cell = el ? el.closest('.cell') : null;
+  if (cell !== touchDrag.currentTargetCell) {
+    if (touchDrag.currentTargetCell) touchDrag.currentTargetCell.classList.remove('drop-target');
+    touchDrag.currentTargetCell = cell;
+    if (cell) cell.classList.add('drop-target');
+  }
+}
+
+function onTouchEnd(e) {
+  if (!touchDrag.piece) return;
+  const piece = touchDrag.piece;
+  const targetCell = touchDrag.currentTargetCell;
+  piece.classList.remove('dragging');
+
+  if (targetCell && targetCell !== touchDrag.srcCell) {
+    const targetPiece = targetCell.firstChild;
+    const srcCell = touchDrag.srcCell;
+
+    // swap
+    srcCell.appendChild(targetPiece);
+    targetCell.appendChild(piece);
+
+    if (enableCheck.checked) checkPositions();
+    else if (isSolved()) finishPuzzle();
+  }
+
+  // очистка подсветок
+  document.querySelectorAll('.cell.drop-target').forEach(el => el.classList.remove('drop-target'));
+
+  touchDrag.piece = null;
+  touchDrag.srcCell = null;
+  touchDrag.currentTargetCell = null;
+}
 </script>
 
 </body>
