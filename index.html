@@ -100,26 +100,20 @@ let imageURL = '';
 let pieces = [];
 let cols = 5, rows = 6;
 let pieceWidth = 100, pieceHeight = 100;
+
+let selectedPiece = null;
+let started = false;
 let startTime = null;
 let timer = null;
-let started = false;
-let draggedPiece = null;
 
-/* Загрузка изображения */
+/* ================= ЗАГРУЗКА ИЗОБРАЖЕНИЯ ================= */
 imgInput.addEventListener('change', e => {
   if (e.target.files[0]) {
     imageURL = URL.createObjectURL(e.target.files[0]);
   }
 });
 
-/* Предпросмотр */
-previewBtn.addEventListener('click', () => {
-  if (!imageURL) return alert('Загрузите изображение');
-  renderPreview();
-  previewContainer.style.display = 'block';
-});
-
-/* Создание пазла */
+/* ================= СОЗДАНИЕ ПАЗЛА ================= */
 generateBtn.addEventListener('click', () => {
   if (!imageURL) return alert('Загрузите изображение');
 
@@ -133,6 +127,7 @@ generateBtn.addEventListener('click', () => {
   puzzle.style.gridTemplateRows = `repeat(${rows}, ${pieceHeight}px)`;
   puzzle.innerHTML = '';
   pieces = [];
+  selectedPiece = null;
 
   for (let i = 0; i < cols * rows; i++) {
     const piece = document.createElement('div');
@@ -149,7 +144,12 @@ generateBtn.addEventListener('click', () => {
       `${(c / (cols - 1)) * 100}% ${(r / (rows - 1)) * 100}%`;
 
     piece.dataset.correct = i;
-    makeDraggable(piece);
+
+    piece.addEventListener('click', e => {
+      e.stopPropagation();
+      selectPiece(piece);
+    });
+
     pieces.push(piece);
   }
 
@@ -157,33 +157,30 @@ generateBtn.addEventListener('click', () => {
   resetTimer();
 });
 
-/* Перемешивание */
+/* ================= ПЕРЕМЕШИВАНИЕ ================= */
 shuffleBtn.addEventListener('click', shuffle);
 
 function shuffle() {
   pieces.sort(() => Math.random() - 0.5);
-  puzzle.innerHTML = '';
-  pieces.forEach(p => puzzle.appendChild(p));
-  shuffleBtn.disabled = false;
+  redrawPuzzle();
   message.textContent = '';
 }
 
-/* Drag */
-function makeDraggable(piece) {
-  piece.draggable = true;
+/* ================= ВЫБОР ДЕТАЛИ ================= */
+function selectPiece(piece) {
+  if (selectedPiece) {
+    selectedPiece.classList.remove('selected');
+  }
 
-  piece.addEventListener('dragstart', () => {
-    draggedPiece = piece;
-    if (!started) startTimer();
-  });
+  selectedPiece = piece;
+  piece.classList.add('selected');
+
+  if (!started) startTimer();
 }
 
-/* Drop строго по координатам */
-puzzle.addEventListener('dragover', e => e.preventDefault());
-
-puzzle.addEventListener('drop', e => {
-  e.preventDefault();
-  if (!draggedPiece) return;
+/* ================= КЛИК ПО ПОЛЮ ================= */
+puzzle.addEventListener('click', e => {
+  if (!selectedPiece) return;
 
   const rect = puzzle.getBoundingClientRect();
   const x = e.clientX - rect.left;
@@ -195,37 +192,35 @@ puzzle.addEventListener('drop', e => {
   if (col < 0 || col >= cols || row < 0 || row >= rows) return;
 
   const targetIndex = row * cols + col;
+  const fromIndex = pieces.indexOf(selectedPiece);
 
-  movePieceToIndex(draggedPiece, targetIndex);
+  if (fromIndex === targetIndex) return;
 
-  if (enableCheck.checked) checkPositions();
-  else if (isSolved()) stopTimer();
+  // меняем местами
+  const temp = pieces[targetIndex];
+  pieces[targetIndex] = selectedPiece;
+  pieces[fromIndex] = temp;
 
-  draggedPiece = null;
-});
-
-/*/
-function movePieceToIndex(piece, targetIndex) {
-  const fromIndex = pieces.indexOf(piece);
-  if (fromIndex === -1 || fromIndex === targetIndex) return;
-
-  pieces.splice(fromIndex, 1);
-  pieces.splice(targetIndex, 0, piece);
+  selectedPiece.classList.remove('selected');
+  selectedPiece = null;
 
   redrawPuzzle();
-}
 
+  if (enableCheck.checked) checkPositions();
+  else if (isSolved()) finishPuzzle();
+});
+
+/* ================= ПЕРЕРИСОВКА ================= */
 function redrawPuzzle() {
   puzzle.innerHTML = '';
   pieces.forEach(p => puzzle.appendChild(p));
 }
 
-/* Проверка */
+/* ================= ПРОВЕРКА ================= */
 function checkPositions() {
-  const children = [...puzzle.children];
   let solved = true;
 
-  children.forEach((p, i) => {
+  pieces.forEach((p, i) => {
     if (+p.dataset.correct === i) {
       p.style.border = '2px solid green';
     } else {
@@ -234,17 +229,20 @@ function checkPositions() {
     }
   });
 
-  if (solved) {
-    message.textContent = 'Пазл собран! 🎉';
-    stopTimer();
-  }
+  if (solved) finishPuzzle();
 }
 
 function isSolved() {
-  return [...puzzle.children].every((p, i) => +p.dataset.correct === i);
+  return pieces.every((p, i) => +p.dataset.correct === i);
 }
 
-/* Таймер */
+/* ================= ФИНИШ ================= */
+function finishPuzzle() {
+  stopTimer();
+  message.textContent = 'Пазл собран! 🎉';
+}
+
+/* ================= ТАЙМЕР ================= */
 function startTimer() {
   started = true;
   startTime = Date.now();
@@ -256,8 +254,6 @@ function startTimer() {
 
 function stopTimer() {
   clearInterval(timer);
-  timerDisplay.textContent =
-    'Пазл собран! Время: ' + Math.floor((Date.now() - startTime) / 1000) + ' сек';
 }
 
 function resetTimer() {
@@ -266,7 +262,13 @@ function resetTimer() {
   timerDisplay.textContent = 'Время: 0 сек';
 }
 
-/* Превью */
+/* ================= ПРЕВЬЮ ================= */
+previewBtn.addEventListener('click', () => {
+  if (!imageURL) return alert('Загрузите изображение');
+  renderPreview();
+  previewContainer.style.display = 'block';
+});
+
 function renderPreview() {
   previewPuzzle.innerHTML = '';
   previewPuzzle.style.width = pieceWidth * cols + 'px';
