@@ -1,10 +1,9 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Виртуальный пазл</title>
-
 <style>
   body {
     font-family: Arial, sans-serif;
@@ -12,6 +11,9 @@
     flex-direction: column;
     align-items: center;
     padding: 20px;
+    margin: 0;
+    min-height: 100vh;
+    background: #f5f5f5;
   }
 
   #controls {
@@ -29,6 +31,7 @@
     padding: 5px;
     touch-action: none;
     background: #fafafa;
+    z-index: 1;
   }
 
   .cell {
@@ -68,6 +71,7 @@
     margin-top: 15px;
     display: none;
     text-align: center;
+    z-index: 1;
   }
 
   #previewPuzzle {
@@ -88,6 +92,52 @@
 
   .cell.drop-target {
     box-shadow: inset 0 0 0 3px rgba(0, 120, 215, 0.25);
+  }
+
+  /* Overlay modal for congratulations */
+  #overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.55);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    padding: 20px;
+  }
+
+  #overlay .modal {
+    background: #fff;
+    padding: 22px;
+    border-radius: 8px;
+    max-width: 90%;
+    width: 420px;
+    text-align: center;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+  }
+
+  #overlay .modal h2 {
+    margin: 6px 0 12px;
+    font-size: 1.25rem;
+  }
+
+  #overlay .modal p {
+    margin: 8px 0 16px;
+  }
+
+  #overlay .modal .actions {
+    display:flex;
+    gap: 8px;
+    justify-content: center;
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  @media (max-width: 520px) {
+    #controls { gap: 6px; }
+    .modal { width: 95%; padding: 14px; }
   }
 </style>
 </head>
@@ -118,332 +168,411 @@
   <div id="previewPuzzle"></div>
 </div>
 
-<div id="puzzle"></div>
-<div id="message"></div>
+<div id="puzzle" aria-label="Поле пазла"></div>
+<div id="message" aria-live="polite"></div>
 <h3 id="timer">Время: 0:00:000 </h3>
 
+<!-- Overlay modal -->
+<div id="overlay" role="dialog" aria-modal="true" aria-hidden="true">
+  <div class="modal" role="document">
+    <h2 id="overlayTitle">Ура! Пазл собран 🎉</h2>
+    <p id="overlayTime">Время: 0:00:000</p>
+    <div class="actions">
+      <button id="overlayOk">ОК</button>
+      <button id="overlayShuffle">Перемешать</button>
+    </div>
+  </div>
+</div>
+
 <script>
-const imgInput = document.getElementById('imageUpload');
-const generateBtn = document.getElementById('generate');
-const shuffleBtn = document.getElementById('shuffleBtn');
-const previewBtn = document.getElementById('previewBtn');
-const enableCheck = document.getElementById('enableCheck');
-const puzzle = document.getElementById('puzzle');
-const previewContainer = document.getElementById('previewContainer');
-const previewPuzzle = document.getElementById('previewPuzzle');
-const message = document.getElementById('message');
-const timerDisplay = document.getElementById('timer');
+  const imgInput = document.getElementById('imageUpload');
+  const generateBtn = document.getElementById('generate');
+  const shuffleBtn = document.getElementById('shuffleBtn');
+  const previewBtn = document.getElementById('previewBtn');
+  const enableCheck = document.getElementById('enableCheck');
+  const puzzle = document.getElementById('puzzle');
+  const previewContainer = document.getElementById('previewContainer');
+  const previewPuzzle = document.getElementById('previewPuzzle');
+  const message = document.getElementById('message');
+  const timerDisplay = document.getElementById('timer');
 
-let imageURL = '';
-let cols = 5, rows = 6;
-let pieceWidth = 100, pieceHeight = 100;
-let cells = [];
-let started = false;
-let startTime = null;
-let timer = null;
-let pieceIdCounter = 0;
+  const overlay = document.getElementById('overlay');
+  const overlayTime = document.getElementById('overlayTime');
+  const overlayOk = document.getElementById('overlayOk');
+  const overlayShuffle = document.getElementById('overlayShuffle');
 
-/* ===== ЗАГРУЗКА ИЗОБРАЖЕНИЯ ===== */
-imgInput.addEventListener('change', e => {
-  if (e.target.files && e.target.files[0]) {
-    imageURL = URL.createObjectURL(e.target.files[0]);
-  }
-});
+  let imageURL = '';
+  let cols = 5, rows = 6;
+  let pieceWidth = 100, pieceHeight = 100;
+  let cells = [];
+  let started = false;
+  let startTime = null;
+  let timer = null;
+  let pieceIdCounter = 0;
+  let solvedAlready = false; // prevent multiple overlays
 
-/* ===== СОЗДАНИЕ ПАЗЛА ===== */
-generateBtn.addEventListener('click', () => {
-  if (!imageURL) return alert('Загрузите изображение');
-
-  cols = Math.max(1, Math.min(20, +document.getElementById('cols').value || 1));
-  rows = Math.max(1, Math.min(20, +document.getElementById('rows').value || 1));
-
-  const canvasSize = 500;
-  pieceWidth = Math.floor(canvasSize / cols);
-  pieceHeight = Math.floor(canvasSize / rows);
-
-  puzzle.innerHTML = '';
-  cells = [];
-  pieceIdCounter = 0;
-
-  puzzle.style.display = 'grid';
-  puzzle.style.gridTemplateColumns = `repeat(${cols}, ${pieceWidth}px)`;
-  puzzle.style.gridTemplateRows = `repeat(${rows}, ${pieceHeight}px)`;
-
-  for (let i = 0; i < cols * rows; i++) {
-    const cell = document.createElement('div');
-    cell.className = 'cell';
-    cell.style.width = pieceWidth + 'px';
-    cell.style.height = pieceHeight + 'px';
-    cell.dataset.index = i;
-
-    cell.addEventListener('dragover', e => {
-      e.preventDefault();
-      cell.classList.add('drop-target');
-    });
-    cell.addEventListener('dragleave', () => cell.classList.remove('drop-target'));
-    cell.addEventListener('drop', onDropOnCell);
-
-    const piece = document.createElement('div');
-    piece.className = 'piece';
-    piece.draggable = true;
-    piece.id = 'piece-' + (pieceIdCounter++);
-
-    const r = Math.floor(i / cols);
-    const c = i % cols;
-
-    piece.style.backgroundImage = `url(${imageURL})`;
-    piece.style.backgroundSize = `${cols * pieceWidth}px ${rows * pieceHeight}px`;
-    piece.style.backgroundPosition = `-${c * pieceWidth}px -${r * pieceHeight}px`;
-    piece.dataset.correct = i;
-
-    piece.addEventListener('dragstart', e => {
-      e.dataTransfer.setData('text/plain', piece.id);
-      piece.classList.add('dragging');
-      if (!started) startTimer();
-    });
-    piece.addEventListener('dragend', () => {
-      piece.classList.remove('dragging');
-      document.querySelectorAll('.cell.drop-target').forEach(el => el.classList.remove('drop-target'));
-    });
-
-    piece.addEventListener('click', e => {
-      e.stopPropagation();
-      toggleSelect(piece);
-    });
-
-    piece.addEventListener('touchstart', onTouchStart, {passive:false});
-    piece.addEventListener('touchmove', onTouchMove, {passive:false});
-    piece.addEventListener('touchend', onTouchEnd);
-
-    cell.appendChild(piece);
-    cells.push(cell);
-    puzzle.appendChild(cell);
-  }
-
-  shuffle();
-  shuffleBtn.disabled = false;
-  resetTimer();
-  message.textContent = '';
-});
-
-/* ===== ПЕРЕМЕШИВАНИЕ ===== */
-shuffleBtn.addEventListener('click', shuffle);
-
-function shuffle() {
-  const pieces = cells.map(c => c.firstChild);
-  for (let i = pieces.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [pieces[i], pieces[j]] = [pieces[j], pieces[i]];
-  }
-  cells.forEach((cell, i) => cell.appendChild(pieces[i]));
-  document.querySelectorAll('.piece').forEach(p => p.style.border = '2px solid transparent');
-  message.textContent = '';
-}
-
-/* ===== DROP на ячейку ===== */
-function onDropOnCell(e) {
-  e.preventDefault();
-  this.classList.remove('drop-target');
-  const draggedId = e.dataTransfer.getData('text/plain');
-  const dragged = document.getElementById(draggedId);
-  if (!dragged) return;
-
-  const targetPiece = this.firstChild;
-  const sourceCell = dragged.parentElement;
-
-  if (sourceCell === this) return;
-
-  sourceCell.appendChild(targetPiece);
-  this.appendChild(dragged);
-
-  dragged.classList.remove('selected', 'dragging');
-  if (enableCheck.checked) checkPositions();
-  else if (isSolved()) finishPuzzle();
-}
-
-/* ===== ВЫДЕЛЕНИЕ КЛИКОМ ===== */
-let selectedPiece = null;
-function toggleSelect(piece) {
-  if (selectedPiece) selectedPiece.classList.remove('selected');
-  if (selectedPiece === piece) {
-    selectedPiece = null;
-  } else {
-    selectedPiece = piece;
-    piece.classList.add('selected');
-  }
-  if (!started && selectedPiece) startTimer();
-}
-
-/* ===== КЛИК ПО ЯЧЕЙКЕ (обмен) ===== */
-puzzle.addEventListener('click', e => {
-  const cell = e.target.closest('.cell');
-  if (!cell || !selectedPiece) return;
-
-  const targetPiece = cell.firstChild;
-  const sourceCell = selectedPiece.parentElement;
-
-  if (targetPiece === selectedPiece) return;
-
-  sourceCell.appendChild(targetPiece);
-  cell.appendChild(selectedPiece);
-
-  selectedPiece.classList.remove('selected');
-  selectedPiece = null;
-
-  if (enableCheck.checked) checkPositions();
-  else if (isSolved()) finishPuzzle();
-});
-
-/* ===== ПРОВЕРКА ===== */
-function checkPositions() {
-  let solved = true;
-
-  cells.forEach((cell, i) => {
-    const piece = cell.firstChild;
-    if (+piece.dataset.correct === i) {
-      piece.style.border = '2px solid green';
-    } else {
-      piece.style.border = '2px solid red';
-      solved = false;
+  /* ===== ЗАГРУЗКА ИЗОБРАЖЕНИЯ ===== */
+  imgInput.addEventListener('change', e => {
+    if (e.target.files && e.target.files[0]) {
+      imageURL = URL.createObjectURL(e.target.files[0]);
     }
   });
 
-  if (solved) finishPuzzle();
-}
+  /* ===== СОЗДАНИЕ ПАЗЛА ===== */
+  generateBtn.addEventListener('click', () => {
+    if (!imageURL) return alert('Загрузите изображение');
 
-function isSolved() {
-  return cells.every((cell, i) =>
-    +cell.firstChild.dataset.correct === i
-  );
-}
+    cols = Math.max(1, Math.min(20, +document.getElementById('cols').value || 1));
+    rows = Math.max(1, Math.min(20, +document.getElementById('rows').value || 1));
 
-/* ===== ФИНИШ ===== */
-function finishPuzzle() {
-  stopTimer();
-  message.textContent = 'Пазл собран! 🎉';
-}
+    const canvasSize = 500;
+    pieceWidth = Math.floor(canvasSize / cols);
+    pieceHeight = Math.floor(canvasSize / rows);
 
-/* ===== ТАЙМЕР ===== */
-function startTimer() {
-  if (started) return;
-  started = true;
-  startTime = performance.now();
+    puzzle.innerHTML = '';
+    cells = [];
+    pieceIdCounter = 0;
+    solvedAlready = false;
 
-  timer = setInterval(() => {
-    const t = performance.now() - startTime;
-    const ms = Math.floor(t % 1000).toString().padStart(3, '0');
-    const sec = Math.floor(t / 1000) % 60;
-    const min = Math.floor(t / 60000);
+    puzzle.style.display = 'grid';
+    puzzle.style.gridTemplateColumns = `repeat(${cols}, ${pieceWidth}px)`;
+    puzzle.style.gridTemplateRows = `repeat(${rows}, ${pieceHeight}px)`;
 
-    timerDisplay.textContent =
-      `Время: ${min}:${sec.toString().padStart(2,'0')}:${ms}`;
-  }, 50);
-}
+    for (let i = 0; i < cols * rows; i++) {
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      cell.style.width = pieceWidth + 'px';
+      cell.style.height = pieceHeight + 'px';
+      cell.dataset.index = i;
 
-function stopTimer() {
-  clearInterval(timer);
-}
+      cell.addEventListener('dragover', e => {
+        e.preventDefault();
+        cell.classList.add('drop-target');
+      });
+      cell.addEventListener('dragleave', () => cell.classList.remove('drop-target'));
+      cell.addEventListener('drop', onDropOnCell);
 
-function resetTimer() {
-  clearInterval(timer);
-  started = false;
-  timerDisplay.textContent = 'Время: 0:00:000';
-}
+      const piece = document.createElement('div');
+      piece.className = 'piece';
+      piece.draggable = true;
+      piece.id = 'piece-' + (pieceIdCounter++);
 
-/* ===== ПРЕВЬЮ — ТАК ЖЕ, КАК ПАЗЛ (СБОРКА) ===== */
-previewBtn.addEventListener('click', () => {
-  if (!imageURL) return alert('Загрузите изображение');
+      const r = Math.floor(i / cols);
+      const c = i % cols;
 
-  // Toggle visibility
-  if (previewContainer.style.display === 'block') {
-    previewContainer.style.display = 'none';
-    previewBtn.textContent = 'Показать картинку';
-    return;
+      piece.style.backgroundImage = `url(${imageURL})`;
+      piece.style.backgroundSize = `${cols * pieceWidth}px ${rows * pieceHeight}px`;
+      piece.style.backgroundPosition = `-${c * pieceWidth}px -${r * pieceHeight}px`;
+      piece.dataset.correct = i;
+
+      piece.addEventListener('dragstart', e => {
+        e.dataTransfer.setData('text/plain', piece.id);
+        piece.classList.add('dragging');
+        if (!started) startTimer();
+      });
+      piece.addEventListener('dragend', () => {
+        piece.classList.remove('dragging');
+        document.querySelectorAll('.cell.drop-target').forEach(el => el.classList.remove('drop-target'));
+      });
+
+      piece.addEventListener('click', e => {
+        e.stopPropagation();
+        toggleSelect(piece);
+      });
+
+      piece.addEventListener('touchstart', onTouchStart, {passive:false});
+      piece.addEventListener('touchmove', onTouchMove, {passive:false});
+      piece.addEventListener('touchend', onTouchEnd);
+
+      cell.appendChild(piece);
+      cells.push(cell);
+      puzzle.appendChild(cell);
+    }
+
+    shuffle();
+    shuffleBtn.disabled = false;
+    resetTimer();
+    message.textContent = '';
+  });
+
+  /* ===== ПЕРЕМЕШИВАНИЕ ===== */
+  shuffleBtn.addEventListener('click', () => {
+    shuffle();
+    solvedAlready = false;
+    hideOverlay();
+    resetTimer();
+    message.textContent = '';
+  });
+
+  function shuffle() {
+    const pieces = cells.map(c => c.firstChild);
+    // Fisher-Yates
+    for (let i = pieces.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [pieces[i], pieces[j]] = [pieces[j], pieces[i]];
+    }
+    cells.forEach((cell, i) => cell.appendChild(pieces[i]));
+    document.querySelectorAll('.piece').forEach(p => p.style.border = '2px solid transparent');
+    message.textContent = '';
   }
 
-  // определяем размеры плитки (если пазл уже создан, используем текущие; иначе по input)
-  const useCols = cols || Math.max(1, +document.getElementById('cols').value || 1);
-  const useRows = rows || Math.max(1, +document.getElementById('rows').value || 1);
-  const canvasSize = 500;
-  const pW = Math.floor(canvasSize / useCols);
-  const pH = Math.floor(canvasSize / useRows);
+  /* ===== DROP на ячейку ===== */
+  function onDropOnCell(e) {
+    e.preventDefault();
+    this.classList.remove('drop-target');
+    const draggedId = e.dataTransfer.getData('text/plain');
+    const dragged = document.getElementById(draggedId);
+    if (!dragged) return;
 
-  previewPuzzle.innerHTML = '';
-  previewPuzzle.style.gridTemplateColumns = `repeat(${useCols}, ${pW}px)`;
-  previewPuzzle.style.gridTemplateRows = `repeat(${useRows}, ${pH}px)`;
+    const targetPiece = this.firstChild;
+    const sourceCell = dragged.parentElement;
 
-  // создаём плитки в правильном порядке (собранный вид)
-  for (let i = 0; i < useCols * useRows; i++) {
-    const r = Math.floor(i / useCols);
-    const c = i % useCols;
+    if (sourceCell === this) return;
 
-    const pp = document.createElement('div');
-    pp.className = 'previewPiece';
-    pp.style.width = pW + 'px';
-    pp.style.height = pH + 'px';
-    pp.style.backgroundImage = `url(${imageURL})`;
-    pp.style.backgroundSize = `${useCols * pW}px ${useRows * pH}px`;
-    pp.style.backgroundPosition = `-${c * pW}px -${r * pH}px`;
-    previewPuzzle.appendChild(pp);
-  }
+    sourceCell.appendChild(targetPiece);
+    this.appendChild(dragged);
 
-  previewContainer.style.display = 'block';
-  previewBtn.textContent = 'Скрыть картинку';
-});
+    dragged.classList.remove('selected', 'dragging');
 
-/* ===== TOUCH-DRAG SUPPORT (для мобильных) ===== */
-let touchDrag = {
-  piece: null,
-  srcCell: null,
-  currentTargetCell: null
-};
-
-function onTouchStart(e) {
-  e.preventDefault();
-  const touch = e.changedTouches[0];
-  const piece = e.currentTarget;
-  touchDrag.piece = piece;
-  touchDrag.srcCell = piece.parentElement;
-  piece.classList.add('dragging');
-  if (!started) startTimer();
-}
-
-function onTouchMove(e) {
-  if (!touchDrag.piece) return;
-  e.preventDefault();
-  const touch = e.changedTouches[0];
-  const el = document.elementFromPoint(touch.clientX, touch.clientY);
-  const cell = el ? el.closest('.cell') : null;
-  if (cell !== touchDrag.currentTargetCell) {
-    if (touchDrag.currentTargetCell) touchDrag.currentTargetCell.classList.remove('drop-target');
-    touchDrag.currentTargetCell = cell;
-    if (cell) cell.classList.add('drop-target');
-  }
-}
-
-function onTouchEnd(e) {
-  if (!touchDrag.piece) return;
-  const piece = touchDrag.piece;
-  const targetCell = touchDrag.currentTargetCell;
-  piece.classList.remove('dragging');
-
-  if (targetCell && targetCell !== touchDrag.srcCell) {
-    const targetPiece = targetCell.firstChild;
-    const srcCell = touchDrag.srcCell;
-
-    srcCell.appendChild(targetPiece);
-    targetCell.appendChild(piece);
-
+    // если пользователь включил проверку — показываем границы и вызываем overlay при успехе
     if (enableCheck.checked) checkPositions();
     else if (isSolved()) finishPuzzle();
   }
 
-  document.querySelectorAll('.cell.drop-target').forEach(el => el.classList.remove('drop-target'));
+  /* ===== ВЫДЕЛЕНИЕ КЛИКОМ ===== */
+  let selectedPiece = null;
+  function toggleSelect(piece) {
+    if (selectedPiece) selectedPiece.classList.remove('selected');
+    if (selectedPiece === piece) {
+      selectedPiece = null;
+    } else {
+      selectedPiece = piece;
+      piece.classList.add('selected');
+    }
+    if (!started && selectedPiece) startTimer();
+  }
 
-  touchDrag.piece = null;
-  touchDrag.srcCell = null;
-  touchDrag.currentTargetCell = null;
-}
+  /* ===== КЛИК ПО ЯЧЕЙКЕ (обмен) ===== */
+  puzzle.addEventListener('click', e => {
+    const cell = e.target.closest('.cell');
+    if (!cell || !selectedPiece) return;
+
+    const targetPiece = cell.firstChild;
+    const sourceCell = selectedPiece.parentElement;
+
+    if (targetPiece === selectedPiece) return;
+
+    sourceCell.appendChild(targetPiece);
+    cell.appendChild(selectedPiece);
+
+    selectedPiece.classList.remove('selected');
+    selectedPiece = null;
+
+    if (enableCheck.checked) checkPositions();
+    else if (isSolved()) finishPuzzle();
+  });
+
+  /* ===== ПРОВЕРКА ===== */
+  function checkPositions() {
+    let solved = true;
+
+    cells.forEach((cell, i) => {
+      const piece = cell.firstChild;
+      if (+piece.dataset.correct === i) {
+        piece.style.border = '2px solid green';
+      } else {
+        piece.style.border = '2px solid red';
+        solved = false;
+      }
+    });
+
+    if (solved) finishPuzzle();
+  }
+
+  function isSolved() {
+    return cells.every((cell, i) =>
+      +cell.firstChild.dataset.correct === i
+    );
+  }
+
+  /* ===== ФИНИШ (показ overlay) ===== */
+  function finishPuzzle() {
+    if (solvedAlready) return;
+    solvedAlready = true;
+
+    stopTimer();
+    message.textContent = 'Пазл собран! 🎉';
+
+    // Показать overlay с итоговым временем
+    const formatted = formatElapsedTime();
+    overlayTime.textContent = `Время: ${formatted}`;
+    showOverlay();
+  }
+
+  /* ===== Показ / скрытие overlay ===== */
+  function showOverlay() {
+    overlay.style.display = 'flex';
+    overlay.setAttribute('aria-hidden', 'false');
+    // блокируем взаимодействие с пазлом (overlay перекрывает всё)
+    document.body.style.overflow = 'hidden';
+  }
+
+  function hideOverlay() {
+    overlay.style.display = 'none';
+    overlay.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+  }
+
+  overlayOk.addEventListener('click', () => {
+    hideOverlay();
+  });
+
+  overlayShuffle.addEventListener('click', () => {
+    hideOverlay();
+    shuffle();
+    resetTimer();
+    solvedAlready = false;
+    message.textContent = '';
+  });
+
+  /* ===== ТАЙМЕР ===== */
+  function startTimer() {
+    if (started) return;
+    started = true;
+    startTime = performance.now();
+
+    timer = setInterval(() => {
+      const t = performance.now() - startTime;
+      const ms = Math.floor(t % 1000).toString().padStart(3, '0');
+      const sec = Math.floor(t / 1000) % 60;
+      const min = Math.floor(t / 60000);
+
+      timerDisplay.textContent =
+        `Время: ${min}:${sec.toString().padStart(2,'0')}:${ms}`;
+    }, 50);
+  }
+
+  function stopTimer() {
+    clearInterval(timer);
+  }
+
+  function resetTimer() {
+    clearInterval(timer);
+    started = false;
+    startTime = null;
+    timerDisplay.textContent = 'Время: 0:00:000';
+  }
+
+  function formatElapsedTime() {
+    if (!startTime) return '0:00:000';
+    const t = performance.now() - startTime;
+    const ms = Math.floor(t % 1000).toString().padStart(3, '0');
+    const sec = Math.floor(t / 1000) % 60;
+    const min = Math.floor(t / 60000);
+    return `${min}:${sec.toString().padStart(2,'0')}:${ms}`;
+  }
+
+  /* ===== ПРЕВЬЮ — ТАК ЖЕ, КАК ПАЗЛ (СБОРКА) ===== */
+  previewBtn.addEventListener('click', () => {
+    if (!imageURL) return alert('Загрузите изображение');
+
+    // Toggle visibility
+    if (previewContainer.style.display === 'block') {
+      previewContainer.style.display = 'none';
+      previewBtn.textContent = 'Показать картинку';
+      return;
+    }
+
+    const useCols = cols || Math.max(1, +document.getElementById('cols').value || 1);
+    const useRows = rows || Math.max(1, +document.getElementById('rows').value || 1);
+    const canvasSize = 500;
+    const pW = Math.floor(canvasSize / useCols);
+    const pH = Math.floor(canvasSize / useRows);
+
+    previewPuzzle.innerHTML = '';
+    previewPuzzle.style.gridTemplateColumns = `repeat(${useCols}, ${pW}px)`;
+    previewPuzzle.style.gridTemplateRows = `repeat(${useRows}, ${pH}px)`;
+
+    for (let i = 0; i < useCols * useRows; i++) {
+      const r = Math.floor(i / useCols);
+      const c = i % useCols;
+
+      const pp = document.createElement('div');
+      pp.className = 'previewPiece';
+      pp.style.width = pW + 'px';
+      pp.style.height = pH + 'px';
+      pp.style.backgroundImage = `url(${imageURL})`;
+      pp.style.backgroundSize = `${useCols * pW}px ${useRows * pH}px`;
+      pp.style.backgroundPosition = `-${c * pW}px -${r * pH}px`;
+      previewPuzzle.appendChild(pp);
+    }
+
+    previewContainer.style.display = 'block';
+    previewBtn.textContent = 'Скрыть картинку';
+  });
+
+  /* ===== TOUCH-DRAG SUPPORT (для мобильных) ===== */
+  let touchDrag = {
+    piece: null,
+    srcCell: null,
+    currentTargetCell: null
+  };
+
+  function onTouchStart(e) {
+    e.preventDefault();
+    const piece = e.currentTarget;
+    touchDrag.piece = piece;
+    touchDrag.srcCell = piece.parentElement;
+    piece.classList.add('dragging');
+    if (!started) startTimer();
+  }
+
+  function onTouchMove(e) {
+    if (!touchDrag.piece) return;
+    e.preventDefault();
+    const touch = e.changedTouches[0];
+    const el = document.elementFromPoint(touch.clientX, touch.clientY);
+    const cell = el ? el.closest('.cell') : null;
+    if (cell !== touchDrag.currentTargetCell) {
+      if (touchDrag.currentTargetCell) touchDrag.currentTargetCell.classList.remove('drop-target');
+      touchDrag.currentTargetCell = cell;
+      if (cell) cell.classList.add('drop-target');
+    }
+  }
+
+  function onTouchEnd(e) {
+    if (!touchDrag.piece) return;
+    const piece = touchDrag.piece;
+    const targetCell = touchDrag.currentTargetCell;
+    piece.classList.remove('dragging');
+
+    if (targetCell && targetCell !== touchDrag.srcCell) {
+      const targetPiece = targetCell.firstChild;
+      const srcCell = touchDrag.srcCell;
+
+      srcCell.appendChild(targetPiece);
+      targetCell.appendChild(piece);
+
+      if (enableCheck.checked) checkPositions();
+      else if (isSolved()) finishPuzzle();
+    }
+
+    document.querySelectorAll('.cell.drop-target').forEach(el => el.classList.remove('drop-target'));
+
+    touchDrag.piece = null;
+    touchDrag.srcCell = null;
+    touchDrag.currentTargetCell = null;
+  }
+
+  // Hide overlay if user presses Escape
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && overlay.style.display === 'flex') {
+      hideOverlay();
+    }
+  });
+
+  // Initial small hint
+  message.textContent = 'Создайте пазл, затем перетаскивайте или кликайте детали для обмена. Можно включить/отключить проверку.';
 </script>
 
 </body>
