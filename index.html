@@ -27,7 +27,8 @@
     gap: 2px;
     border: 2px solid #000;
     padding: 5px;
-    touch-action: none; /* для лучшей работы touch */
+    touch-action: none;
+    background: #fafafa;
   }
 
   .cell {
@@ -69,14 +70,22 @@
     text-align: center;
   }
 
-  .previewPiece {
-    display: inline-block;
+  #previewPuzzle {
+    display: grid;
+    gap: 2px;
     border: 2px solid #444;
-    margin: 1px;
-    background-size: cover;
+    padding: 5px;
+    background: #fff;
   }
 
-  /* подсказка при dragover */
+  .previewPiece {
+    width: 100%;
+    height: 100%;
+    background-size: cover;
+    box-sizing: border-box;
+    border: 2px solid #44444a;
+  }
+
   .cell.drop-target {
     box-shadow: inset 0 0 0 3px rgba(0, 120, 215, 0.25);
   }
@@ -148,7 +157,6 @@ generateBtn.addEventListener('click', () => {
   cols = Math.max(1, Math.min(20, +document.getElementById('cols').value || 1));
   rows = Math.max(1, Math.min(20, +document.getElementById('rows').value || 1));
 
-  // Размер "холста" фиксируем 500x500 для расчёта фона, но сетка масштабируется
   const canvasSize = 500;
   pieceWidth = Math.floor(canvasSize / cols);
   pieceHeight = Math.floor(canvasSize / rows);
@@ -161,7 +169,6 @@ generateBtn.addEventListener('click', () => {
   puzzle.style.gridTemplateColumns = `repeat(${cols}, ${pieceWidth}px)`;
   puzzle.style.gridTemplateRows = `repeat(${rows}, ${pieceHeight}px)`;
 
-  // Создаем ячейки и детали
   for (let i = 0; i < cols * rows; i++) {
     const cell = document.createElement('div');
     cell.className = 'cell';
@@ -169,7 +176,6 @@ generateBtn.addEventListener('click', () => {
     cell.style.height = pieceHeight + 'px';
     cell.dataset.index = i;
 
-    // обработчики для dragover/drop
     cell.addEventListener('dragover', e => {
       e.preventDefault();
       cell.classList.add('drop-target');
@@ -190,7 +196,6 @@ generateBtn.addEventListener('click', () => {
     piece.style.backgroundPosition = `-${c * pieceWidth}px -${r * pieceHeight}px`;
     piece.dataset.correct = i;
 
-    // drag events (desktop)
     piece.addEventListener('dragstart', e => {
       e.dataTransfer.setData('text/plain', piece.id);
       piece.classList.add('dragging');
@@ -201,14 +206,11 @@ generateBtn.addEventListener('click', () => {
       document.querySelectorAll('.cell.drop-target').forEach(el => el.classList.remove('drop-target'));
     });
 
-    // click selection (fallback)
     piece.addEventListener('click', e => {
       e.stopPropagation();
-      // если клик на элемент — выделим и позволим клик по ячейке для обмена
       toggleSelect(piece);
     });
 
-    // touch support (mobile)
     piece.addEventListener('touchstart', onTouchStart, {passive:false});
     piece.addEventListener('touchmove', onTouchMove, {passive:false});
     piece.addEventListener('touchend', onTouchEnd);
@@ -218,7 +220,7 @@ generateBtn.addEventListener('click', () => {
     puzzle.appendChild(cell);
   }
 
-  shuffle(); // перемешиваем при создании
+  shuffle();
   shuffleBtn.disabled = false;
   resetTimer();
   message.textContent = '';
@@ -229,18 +231,16 @@ shuffleBtn.addEventListener('click', shuffle);
 
 function shuffle() {
   const pieces = cells.map(c => c.firstChild);
-  // Fisher-Yates для качественного перемешивания
   for (let i = pieces.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [pieces[i], pieces[j]] = [pieces[j], pieces[i]];
   }
   cells.forEach((cell, i) => cell.appendChild(pieces[i]));
-  // сброс обводок
   document.querySelectorAll('.piece').forEach(p => p.style.border = '2px solid transparent');
   message.textContent = '';
 }
 
-/* ===== ПОМЕЩЕНИЕ ПРИ DROP ===== */
+/* ===== DROP на ячейку ===== */
 function onDropOnCell(e) {
   e.preventDefault();
   this.classList.remove('drop-target');
@@ -251,20 +251,17 @@ function onDropOnCell(e) {
   const targetPiece = this.firstChild;
   const sourceCell = dragged.parentElement;
 
-  // если цель — та же ячейка, ничего не делаем
   if (sourceCell === this) return;
 
-  // меняем местами элементы
   sourceCell.appendChild(targetPiece);
   this.appendChild(dragged);
 
-  // завершение: убрать выбор / класс
   dragged.classList.remove('selected', 'dragging');
   if (enableCheck.checked) checkPositions();
   else if (isSolved()) finishPuzzle();
 }
 
-/* ===== ВЫДЕЛЕНИЕ ДЕТАЛИ КЛИКОМ ===== */
+/* ===== ВЫДЕЛЕНИЕ КЛИКОМ ===== */
 let selectedPiece = null;
 function toggleSelect(piece) {
   if (selectedPiece) selectedPiece.classList.remove('selected');
@@ -274,12 +271,10 @@ function toggleSelect(piece) {
     selectedPiece = piece;
     piece.classList.add('selected');
   }
-
-  // первый ход запускает таймер
   if (!started && selectedPiece) startTimer();
 }
 
-/* ===== КЛИК ПО ЯЧЕЙКЕ ДЛЯ ОБМЕНА (при выделенной детали) ===== */
+/* ===== КЛИК ПО ЯЧЕЙКЕ (обмен) ===== */
 puzzle.addEventListener('click', e => {
   const cell = e.target.closest('.cell');
   if (!cell || !selectedPiece) return;
@@ -355,15 +350,45 @@ function resetTimer() {
   timerDisplay.textContent = 'Время: 0:00:000';
 }
 
-/* ===== ПРЕВЬЮ — ЦЕЛЬНАЯ КАРТИНКА ===== */
+/* ===== ПРЕВЬЮ — ТАК ЖЕ, КАК ПАЗЛ (СБОРКА) ===== */
 previewBtn.addEventListener('click', () => {
   if (!imageURL) return alert('Загрузите изображение');
+
+  // Toggle visibility
+  if (previewContainer.style.display === 'block') {
+    previewContainer.style.display = 'none';
+    previewBtn.textContent = 'Показать картинку';
+    return;
+  }
+
+  // определяем размеры плитки (если пазл уже создан, используем текущие; иначе по input)
+  const useCols = cols || Math.max(1, +document.getElementById('cols').value || 1);
+  const useRows = rows || Math.max(1, +document.getElementById('rows').value || 1);
+  const canvasSize = 500;
+  const pW = Math.floor(canvasSize / useCols);
+  const pH = Math.floor(canvasSize / useRows);
+
   previewPuzzle.innerHTML = '';
-  const img = new Image();
-  img.src = imageURL;
-  img.style.width = `${cols * pieceWidth}px`;
-  previewPuzzle.appendChild(img);
+  previewPuzzle.style.gridTemplateColumns = `repeat(${useCols}, ${pW}px)`;
+  previewPuzzle.style.gridTemplateRows = `repeat(${useRows}, ${pH}px)`;
+
+  // создаём плитки в правильном порядке (собранный вид)
+  for (let i = 0; i < useCols * useRows; i++) {
+    const r = Math.floor(i / useCols);
+    const c = i % useCols;
+
+    const pp = document.createElement('div');
+    pp.className = 'previewPiece';
+    pp.style.width = pW + 'px';
+    pp.style.height = pH + 'px';
+    pp.style.backgroundImage = `url(${imageURL})`;
+    pp.style.backgroundSize = `${useCols * pW}px ${useRows * pH}px`;
+    pp.style.backgroundPosition = `-${c * pW}px -${r * pH}px`;
+    previewPuzzle.appendChild(pp);
+  }
+
   previewContainer.style.display = 'block';
+  previewBtn.textContent = 'Скрыть картинку';
 });
 
 /* ===== TOUCH-DRAG SUPPORT (для мобильных) ===== */
@@ -374,14 +399,12 @@ let touchDrag = {
 };
 
 function onTouchStart(e) {
-  e.preventDefault(); // чтобы не скроллить страницу при перетаскивании
+  e.preventDefault();
   const touch = e.changedTouches[0];
   const piece = e.currentTarget;
   touchDrag.piece = piece;
   touchDrag.srcCell = piece.parentElement;
   piece.classList.add('dragging');
-
-  // начать таймер, если ещё не начали
   if (!started) startTimer();
 }
 
@@ -389,7 +412,6 @@ function onTouchMove(e) {
   if (!touchDrag.piece) return;
   e.preventDefault();
   const touch = e.changedTouches[0];
-  // элемент под пальцем
   const el = document.elementFromPoint(touch.clientX, touch.clientY);
   const cell = el ? el.closest('.cell') : null;
   if (cell !== touchDrag.currentTargetCell) {
@@ -409,7 +431,6 @@ function onTouchEnd(e) {
     const targetPiece = targetCell.firstChild;
     const srcCell = touchDrag.srcCell;
 
-    // swap
     srcCell.appendChild(targetPiece);
     targetCell.appendChild(piece);
 
@@ -417,7 +438,6 @@ function onTouchEnd(e) {
     else if (isSolved()) finishPuzzle();
   }
 
-  // очистка подсветок
   document.querySelectorAll('.cell.drop-target').forEach(el => el.classList.remove('drop-target'));
 
   touchDrag.piece = null;
