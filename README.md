@@ -11,4 +11,4 @@
 | 7 | Value B  |
 | 8 | Value E  | 
 | 9 | Value B  |
-| 10 | Value E  | 
+|10 | Value E  | 
