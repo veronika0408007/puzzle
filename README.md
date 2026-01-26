@@ -1,4 +1,4 @@
-# puzzle
+# puzle
 
 | Nedeļas | Darba Plāns |
 |----------|----------|
