@@ -2,13 +2,13 @@
 
 | Nedeļas | Darba Plāns |
 |----------|----------|
-| 1 | Value B  |
+| 1 | Sagatavot izstrades vidi.(bibliotekas, atkaribas(dependencies) |
 | 2 | Value E  | 
-| 3 | Value B  |
-| 4 | Value E  | 
-| 5 | Value B  |
-| 6 | Value E  | 
-| 7 | Value B  |
-| 8 | Value E  | 
+| 3 | Dizaina izstrāde ar CSS (krāsas, izkārtojums, responsīvs dizains) |
+| 4 | Attēlu augšupielādes funkcionalitātes izstrāde | 
+| 5 | Attēla sadalīšana puzles detaļās, izmantojot JavaScript |
+| 6 | Puzles detaļu nejauša jaukšana (shuffle) | 
+| 7 | Puzles detaļu pārvietošanas (drag & drop) mehānisma izstrāde|
+| 8 | Laika uzskaites, restartēšanas un oriģinālā attēla apskates funkciju ieviešana | 
 | 9 | Value B  |
-|10 | Value E  | 
+|10 | Uzlabojumi, akcepttestēšana un vienību testēšana vai integrāciju testēšana | 
